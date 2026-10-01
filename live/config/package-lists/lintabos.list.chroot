@@ -1,3 +1,8 @@
+# ---- LintabOS's own parts: tablet tuning, installer, BitLocker tools, updater, branding -------------
+# Built from payload/ by scripts/build-deb.sh and served from config/packages.chroot; it is installed only because
+# it is named here.
+lintabos-core
+
 # ---- Desktop ---------------------------------------------------------------
 gnome-core
 gdm3
