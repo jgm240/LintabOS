@@ -1,0 +1,2 @@
+# Allow members of "video" to set LED brightness (used by `lintab-led`).
+ACTION=="add|change", SUBSYSTEM=="leds", RUN+="/bin/chgrp video /sys%p/brightness", RUN+="/bin/chmod g+w /sys%p/brightness"

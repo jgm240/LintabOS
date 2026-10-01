@@ -1,0 +1,45 @@
+#!/bin/sh
+# SPDX-License-Identifier: MIT
+# LintabOS: emit a "Boot into Windows" menu entry.
+#
+# Looks for the Windows Boot Manager on any EFI System Partition and chainloads
+# it by filesystem UUID, so the entry keeps working if disks are re-enumerated.
+# Prints nothing (and so adds no entry) when Windows isn't installed.
+set -e
+
+[ -d /sys/firmware/efi ] || exit 0
+
+BOOTMGR=/EFI/Microsoft/Boot/bootmgfw.efi
+
+for dev in $(blkid -t TYPE=vfat -o device 2>/dev/null); do
+    mnt=$(findmnt -n -o TARGET --source "$dev" 2>/dev/null | head -n1 || true)
+    tmp=""
+    if [ -z "$mnt" ]; then
+        tmp=$(mktemp -d)
+        if ! mount -o ro "$dev" "$tmp" 2>/dev/null; then
+            rmdir "$tmp"
+            continue
+        fi
+        mnt=$tmp
+    fi
+    found=no
+    [ -f "$mnt$BOOTMGR" ] && found=yes
+    if [ -n "$tmp" ]; then
+        umount "$tmp"
+        rmdir "$tmp"
+    fi
+    if [ "$found" = yes ]; then
+        uuid=$(blkid -s UUID -o value "$dev")
+        cat <<ENTRY
+menuentry 'Boot into Windows' --class windows --class os \$menuentry_id_option 'lintab-windows' {
+    insmod part_gpt
+    insmod fat
+    insmod chain
+    search --no-floppy --fs-uuid --set=root $uuid
+    chainloader $BOOTMGR
+}
+ENTRY
+        exit 0
+    fi
+done
+exit 0

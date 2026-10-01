@@ -1,0 +1,71 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <title>LintabOS</title>
+  <defs>
+    <linearGradient id="screen" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#35d0ba"/>
+      <stop offset="0.55" stop-color="#2a8fe0"/>
+      <stop offset="1" stop-color="#4b4fd9"/>
+    </linearGradient>
+    <linearGradient id="bezel" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#3a4152"/>
+      <stop offset="1" stop-color="#1d212c"/>
+    </linearGradient>
+    <linearGradient id="belly" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="1" stop-color="#dfe6ee"/>
+    </linearGradient>
+    <linearGradient id="orange" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffc83d"/>
+      <stop offset="1" stop-color="#f08a1c"/>
+    </linearGradient>
+    <clipPath id="screenclip">
+      <rect x="62" y="110" width="388" height="236" rx="10"/>
+    </clipPath>
+  </defs>
+
+  <!-- Tablet (IdeaPad Duet 3, landscape) -->
+  <rect x="44" y="92" width="424" height="272" rx="26" fill="url(#bezel)"/>
+  <rect x="62" y="110" width="388" height="236" rx="10" fill="url(#screen)"/>
+  <!-- screen glare -->
+  <g clip-path="url(#screenclip)">
+    <path d="M62 110 H300 L150 346 H62 Z" fill="#ffffff" opacity="0.10"/>
+  </g>
+  <!-- front camera + LED -->
+  <circle cx="256" cy="101" r="3.2" fill="#0c0e13"/>
+  <circle cx="268" cy="101" r="1.6" fill="#7dffb0"/>
+  <!-- power button / fingerprint reader on the top edge -->
+  <rect x="392" y="87" width="40" height="6" rx="3" fill="#596177"/>
+
+  <!-- Tux, standing in front of the tablet -->
+  <!-- feet -->
+  <ellipse cx="208" cy="452" rx="44" ry="17" fill="url(#orange)"/>
+  <ellipse cx="304" cy="452" rx="44" ry="17" fill="url(#orange)"/>
+  <!-- flippers -->
+  <path d="M186 292 C150 322 134 372 146 414 C168 398 182 364 204 330 Z" fill="#14161c"/>
+  <path d="M326 292 C362 322 378 372 366 414 C344 398 330 364 308 330 Z" fill="#14161c"/>
+  <!-- body + head -->
+  <path d="M256 150
+           C210 150 194 190 199 230
+           C202 258 184 280 170 310
+           C150 352 154 412 184 440
+           C204 458 308 458 328 440
+           C358 412 362 352 342 310
+           C328 280 310 258 313 230
+           C318 190 302 150 256 150 Z" fill="#14161c"/>
+  <!-- belly -->
+  <path d="M256 262
+           C222 262 200 312 200 364
+           C200 416 226 444 256 444
+           C286 444 312 416 312 364
+           C312 312 290 262 256 262 Z" fill="url(#belly)"/>
+  <!-- eyes -->
+  <ellipse cx="236" cy="204" rx="15" ry="20" fill="#ffffff"/>
+  <ellipse cx="276" cy="204" rx="15" ry="20" fill="#ffffff"/>
+  <ellipse cx="240" cy="208" rx="6.5" ry="9" fill="#14161c"/>
+  <ellipse cx="272" cy="208" rx="6.5" ry="9" fill="#14161c"/>
+  <circle cx="242" cy="204" r="2.2" fill="#ffffff"/>
+  <circle cx="274" cy="204" r="2.2" fill="#ffffff"/>
+  <!-- beak -->
+  <path d="M256 222 C238 222 224 232 224 240 C224 250 240 258 256 258 C272 258 288 250 288 240 C288 232 274 222 256 222 Z" fill="url(#orange)"/>
+  <path d="M228 240 C240 246 272 246 284 240" fill="none" stroke="#c96a10" stroke-width="2.5" stroke-linecap="round"/>
+</svg>

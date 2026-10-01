@@ -1,0 +1,6 @@
+#!/bin/sh
+# SPDX-License-Identifier: MIT
+# Boot Windows once, then fall back to the normal default. Needs root (polkit).
+set -e
+grub-reboot lintab-windows
+exec systemctl reboot

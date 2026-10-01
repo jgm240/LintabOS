@@ -1,0 +1,67 @@
+# LintabOS GRUB theme (installed system). Fonts are loaded by grub-mkconfig from
+# the *.pf2 files next to this file.
+desktop-image: "background.png"
+desktop-color: "#0b1530"
+title-text: ""
+title-color: "#ffffff"
+message-font: "DejaVu Sans Regular 28"
+message-color: "#cfd8ff"
+terminal-font: "DejaVu Sans Regular 28"
+
++ image {
+    left = 50%-128
+    top = 6%
+    width = 256
+    height = 256
+    file = "logo.png"
+}
+
++ label {
+    top = 6%+270
+    left = 0
+    width = 100%
+    align = "center"
+    text = "LintabOS"
+    font = "DejaVu Sans Bold 40"
+    color = "#ffffff"
+}
+
++ boot_menu {
+    left = 25%
+    width = 50%
+    top = 40%
+    height = 42%
+    item_font = "DejaVu Sans Regular 28"
+    item_color = "#a9b6e6"
+    selected_item_font = "DejaVu Sans Bold 28"
+    selected_item_color = "#ffffff"
+    selected_item_pixmap_style = "select_*.png"
+    item_height = 52
+    item_padding = 14
+    item_spacing = 10
+    icon_width = 0
+    icon_height = 0
+    item_icon_space = 0
+}
+
++ progress_bar {
+    id = "__timeout__"
+    left = 25%
+    width = 50%
+    top = 100%-110
+    height = 12
+    fg_color = "#35d0ba"
+    bg_color = "#1b2a55"
+    border_color = "#1b2a55"
+    text = ""
+}
+
++ label {
+    top = 100%-70
+    left = 0
+    width = 100%
+    align = "center"
+    text = "Use the arrow keys and Enter  ·  E to edit  ·  C for command line"
+    font = "DejaVu Sans Regular 28"
+    color = "#7f8fc4"
+}

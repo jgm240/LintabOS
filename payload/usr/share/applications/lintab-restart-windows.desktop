@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Restart into Windows
+Comment=Reboot and start Windows once
+Exec=pkexec /usr/libexec/lintab/reboot-windows
+Icon=system-reboot-symbolic
+Categories=System;
+Keywords=windows;dualboot;reboot;

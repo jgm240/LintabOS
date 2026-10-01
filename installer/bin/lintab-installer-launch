@@ -1,0 +1,11 @@
+#!/bin/sh
+# SPDX-License-Identifier: MIT
+# Starts the installer with the privileges it needs (live sessions have
+# passwordless sudo) while keeping access to this user's display.
+if [ "$(id -u)" -eq 0 ]; then
+    exec lintab-installer "$@"
+fi
+exec sudo -n env \
+    XDG_RUNTIME_DIR="$XDG_RUNTIME_DIR" WAYLAND_DISPLAY="${WAYLAND_DISPLAY:-}" DISPLAY="${DISPLAY:-}" \
+    DBUS_SESSION_BUS_ADDRESS="${DBUS_SESSION_BUS_ADDRESS:-}" XDG_DATA_DIRS="${XDG_DATA_DIRS:-}" \
+    lintab-installer "$@"

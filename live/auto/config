@@ -1,0 +1,31 @@
+#!/bin/sh
+# SPDX-License-Identifier: MIT
+# live-build configuration for LintabOS (Debian 13 "trixie", amd64, UEFI).
+set -e
+
+lb config noauto \
+    --distribution trixie \
+    --architectures amd64 \
+    --linux-flavours amd64 \
+    --archive-areas "main contrib non-free non-free-firmware" \
+    --parent-archive-areas "main contrib non-free non-free-firmware" \
+    --backports true \
+    --security true --updates true \
+    --apt-recommends true \
+    --binary-image iso-hybrid \
+    --bootloaders grub-efi \
+    --uefi-secure-boot auto \
+    --debian-installer none \
+    --memtest none \
+    --win32-loader false \
+    --firmware-chroot false --firmware-binary false \
+    --cache true --cache-indices true --cache-packages true --cache-stages "bootstrap" \
+    --chroot-squashfs-compression-type zstd \
+    --chroot-squashfs-compression-level 15 \
+    --iso-application "LintabOS" \
+    --iso-publisher "LintabOS" \
+    --iso-volume "LINTABOS" \
+    --image-name "lintabos" \
+    --bootappend-live "boot=live components quiet splash username=lintab hostname=lintabos locales=en_US.UTF-8 keyboard-layouts=us timezone=UTC" \
+    --bootappend-live-failsafe "boot=live components memtest=none nomodeset username=lintab" \
+    "${@}"

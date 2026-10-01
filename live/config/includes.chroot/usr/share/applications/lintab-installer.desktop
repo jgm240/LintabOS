@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Install LintabOS
+Comment=Install LintabOS on this tablet, alongside Windows or on its own
+Exec=lintab-installer-launch
+Icon=org.lintabos.Installer
+Categories=System;
+Terminal=false

@@ -1,0 +1,103 @@
+# ---- Desktop ---------------------------------------------------------------
+gnome-core
+gdm3
+gnome-tweaks
+gnome-shell-extension-manager
+gnome-software
+gnome-software-plugin-flatpak
+flatpak
+xdg-desktop-portal-gnome
+firefox-esr
+gnome-snapshot
+papers
+loupe
+gnome-text-editor
+plymouth
+plymouth-themes
+fonts-cantarell
+fonts-noto-color-emoji
+locales
+console-setup
+keyboard-configuration
+sudo
+xdg-user-dirs-gtk
+
+# ---- Tablet behaviour ------------------------------------------------------
+# Auto-rotation and the on-screen keyboard are built into GNOME Shell; these
+# are what feed it: sensor proxy for the accelerometer, ibus for input.
+iio-sensor-proxy
+libinput-tools
+evtest
+ibus
+power-profiles-daemon
+thermald
+upower
+systemd-zram-generator
+lm-sensors
+pciutils
+usbutils
+v4l-utils
+
+# ---- Fingerprint (Goodix 27c6:6512 in the power button) ----------------------
+fprintd
+libpam-fprintd
+libfprint-2-2
+
+# ---- Cameras (Intel IPU6 + libcamera software ISP) -----------------------------
+libcamera-ipa
+libcamera-tools
+libcamera-v4l2
+gstreamer1.0-libcamera
+gstreamer1.0-pipewire
+pipewire-libcamera
+wireplumber
+
+# ---- Firmware and drivers for the 11IAN8 (N100/N200, AX201, UFS) ---------------
+linux-image-amd64
+firmware-linux-free
+firmware-iwlwifi
+firmware-intel-misc
+firmware-intel-graphics
+firmware-intel-sound
+firmware-sof-signed
+firmware-misc-nonfree
+firmware-realtek
+firmware-mediatek
+intel-microcode
+alsa-ucm-conf
+alsa-utils
+intel-media-va-driver-non-free
+mesa-va-drivers
+mesa-vulkan-drivers
+bluez
+network-manager
+network-manager-gnome
+
+# ---- Installer, partitioner, dual-boot ----------------------------------------
+python3
+python3-gi
+python3-gi-cairo
+gir1.2-gtk-4.0
+gir1.2-adw-1
+fdisk
+gdisk
+parted
+ntfs-3g
+dosfstools
+e2fsprogs
+rsync
+efibootmgr
+grub-efi-amd64
+grub-efi-amd64-signed
+shim-signed
+cryptsetup
+os-prober
+
+# ---- BitLocker: read/unlock/decrypt Windows' encrypted drive (dislocker, via FUSE) ----------
+dislocker
+ruby
+fuse3
+libbde-utils
+mtools
+polkitd
+pkexec

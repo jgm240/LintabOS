@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Unlock BitLocker Drive
+Comment=Open an encrypted Windows drive with its recovery key
+Exec=lintab-bitlocker-gui
+Icon=drive-harddisk-encrypted-symbolic
+Categories=System;Utility;
+Keywords=bitlocker;windows;encrypted;dislocker;recovery;

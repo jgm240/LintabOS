@@ -1,0 +1,34 @@
+#!/bin/sh
+# SPDX-License-Identifier: MIT
+set -e
+
+case "$1" in
+configure)
+    # dislocker's decrypted view must be reachable by normal users (fuse3 owns this file; we only edit it).
+    if [ -f /etc/fuse.conf ]; then
+        sed -i 's/^#[[:space:]]*user_allow_other/user_allow_other/' /etc/fuse.conf
+    fi
+
+    # Compile what we ship: GNOME defaults, udev rules, hardware database, icons.
+    if command -v dconf >/dev/null 2>&1; then dconf update || true; fi
+    if command -v udevadm >/dev/null 2>&1; then udevadm control --reload 2>/dev/null || true; fi
+    if command -v systemd-hwdb >/dev/null 2>&1; then systemd-hwdb update 2>/dev/null || true; fi
+    if command -v gtk-update-icon-cache >/dev/null 2>&1; then
+        gtk-update-icon-cache -q -f /usr/share/icons/hicolor 2>/dev/null || true
+    fi
+
+    # The daily, unprivileged "is there a new release?" check, for every user.
+    if command -v systemctl >/dev/null 2>&1; then
+        systemctl --global enable lintab-update-check.timer >/dev/null 2>&1 || true
+    fi
+
+    # An upgrade (not the first install): refresh what depends on the files we ship.
+    # On a first install the installer / image build does these itself.
+    if [ -n "$2" ]; then
+        if command -v update-grub >/dev/null 2>&1 && [ -f /boot/grub/grub.cfg ]; then update-grub 2>/dev/null || true; fi
+        if command -v update-initramfs >/dev/null 2>&1; then update-initramfs -u 2>/dev/null || true; fi
+    fi
+    ;;
+esac
+
+exit 0

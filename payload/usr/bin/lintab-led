@@ -1,0 +1,29 @@
+#!/bin/sh
+# SPDX-License-Identifier: MIT
+# lintab-led: list and control the tablet's LEDs (/sys/class/leds).
+#   lintab-led list
+#   lintab-led set <name> <0-max|on|off>
+set -eu
+LEDS=/sys/class/leds
+
+case "${1:-list}" in
+list)
+    [ -d "$LEDS" ] && [ -n "$(ls -A "$LEDS" 2>/dev/null)" ] || { echo "No LEDs exposed by the kernel."; exit 1; }
+    for d in "$LEDS"/*; do
+        printf '%-32s %s/%s\n' "$(basename "$d")" "$(cat "$d/brightness")" "$(cat "$d/max_brightness")"
+    done
+    ;;
+set)
+    name=${2:?usage: lintab-led set <name> <value|on|off>}
+    val=${3:?usage: lintab-led set <name> <value|on|off>}
+    d=$LEDS/$name
+    [ -d "$d" ] || { echo "No such LED: $name (try: lintab-led list)" >&2; exit 1; }
+    max=$(cat "$d/max_brightness")
+    case "$val" in on) val=$max ;; off) val=0 ;; esac
+    echo "$val" > "$d/brightness"
+    ;;
+*)
+    echo "usage: lintab-led list | set <name> <value|on|off>" >&2
+    exit 2
+    ;;
+esac

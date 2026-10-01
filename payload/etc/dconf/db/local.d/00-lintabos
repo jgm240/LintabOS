@@ -1,0 +1,37 @@
+# LintabOS defaults for the Lenovo IdeaPad Duet 3 (touch-first tablet).
+
+[org/gnome/desktop/a11y/applications]
+# Always offer the on-screen keyboard; the detachable folio keyboard is a USB
+# device, so GNOME can't infer "tablet mode" from keyboard presence alone.
+screen-keyboard-enabled=true
+
+[org/gnome/settings-daemon/peripherals/touchscreen]
+# Rotation follows the accelerometer (iio-sensor-proxy); Quick Settings has the lock toggle.
+orientation-lock=false
+
+[org/gnome/mutter]
+experimental-features=['scale-monitor-framebuffer', 'xwayland-native-scaling']
+edge-tiling=true
+
+[org/gnome/desktop/interface]
+color-scheme='prefer-dark'
+enable-hot-corners=false
+
+[org/gnome/desktop/peripherals/touchpad]
+tap-to-click=true
+natural-scroll=true
+
+[org/gnome/desktop/background]
+picture-uri='file:///usr/share/backgrounds/lintabos/lintabos.png'
+picture-uri-dark='file:///usr/share/backgrounds/lintabos/lintabos.png'
+primary-color='#0b1530'
+
+[org/gnome/desktop/screensaver]
+picture-uri='file:///usr/share/backgrounds/lintabos/lintabos.png'
+
+[org/gnome/shell]
+favorite-apps=['org.gnome.Nautilus.desktop', 'firefox-esr.desktop', 'org.gnome.Snapshot.desktop', 'org.gnome.Console.desktop', 'org.gnome.Settings.desktop', 'lintab-restart-windows.desktop']
+welcome-dialog-last-shown-version='99.0'
+
+[org/gnome/desktop/wm/preferences]
+button-layout='appmenu:minimize,maximize,close'

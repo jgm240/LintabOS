@@ -1,0 +1,9 @@
+[Unit]
+Description=Check GitHub for a new LintabOS release
+ConditionACPower=true
+
+[Service]
+Type=oneshot
+# Unprivileged: only asks GitHub whether a newer release exists and shows a notification.
+ExecStart=/usr/bin/lintab-update check --notify --quiet
+Nice=15

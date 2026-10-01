@@ -1,0 +1,58 @@
+# Notices
+
+LintabOS is an **unofficial** Debian-based operating system. It is not affiliated with, endorsed by, or sponsored
+by Debian, Software in the Public Interest, Lenovo, Microsoft, Mozilla, Intel, the GNOME Foundation or the Linux
+Foundation.
+
+## Trademarks
+
+- Debian is a registered trademark owned by Software in the Public Interest, Inc. LintabOS uses the name only to
+  say truthfully what it is based on.
+- Linux is the registered trademark of Linus Torvalds in the U.S. and other countries.
+- Windows and BitLocker are trademarks of Microsoft Corporation. They are named here only to describe what
+  LintabOS can read, install beside, and boot.
+- Lenovo and IdeaPad are trademarks of Lenovo. They are named only to say which hardware LintabOS is built for.
+- Firefox is a trademark of the Mozilla Foundation. The browser is Debian's unmodified Firefox ESR package.
+- GNOME is a trademark of the GNOME Foundation. Intel is a trademark of Intel Corporation.
+
+## Credits
+
+- **Tux**, the Linux penguin, was created by Larry Ewing (lewing@isc.tamu.edu) using The GIMP, and released with the
+  permission "to use and/or modify this image … provided you acknowledge me … and The GIMP". The LintabOS logo is
+  an original drawing of that character, standing in front of a tablet.
+- The GRUB menu fonts are bitmap conversions of **DejaVu Sans** (derived from Bitstream Vera, © Bitstream, Inc.;
+  DejaVu changes are public domain). Their license is in `LICENSES/Bitstream-Vera-DejaVu.txt` and is also
+  installed next to the fonts.
+- BitLocker support uses **dislocker** (GPL-2.0-or-later, with BSD-3-Clause parts) and, optionally, **libbde**
+  (LGPL-3.0-or-later). The recovery-key rules and the volume layout were checked against dislocker's source and
+  the libbde format documentation; no code was copied from either.
+
+## License of LintabOS's own code
+
+The original files of this project (installer, partitioner, BitLocker tools, scripts, configuration and artwork) are
+under the **MIT License** (`LICENSE`). Third-party material keeps its own license, as listed below. The Tux
+credit above stays required wherever the logo is used.
+
+## Software licenses
+
+LintabOS is a collection of separate programs, each under its own license: about 1,560 Debian packages, mostly
+GPL, LGPL, MIT, BSD and Apache-2.0 licenses, plus a few redistributable firmware blobs from Debian's
+`non-free-firmware` section, and one MIT-licensed package from `non-free` (`intel-media-va-driver-non-free`, which only ships pre-built GPU kernels without source). Each package's
+license is in `/usr/share/doc/<package>/copyright` on the installed system; full license texts are in
+`/usr/share/common-licenses/`. The exact package list and versions are in `live/filesystem.packages` on the
+installation medium.
+
+Putting those programs on one medium is "mere aggregation" and does not bring any of them under another's
+license (see GPL-2.0, section 2). The LintabOS installer and tools call dislocker and the other programs as
+separate processes.
+
+## Source code offer (GPL-2.0 §3(b), GPL-3.0 §6, LGPL)
+
+For at least three years after you receive this image, you may obtain the complete corresponding source code of
+the GPL- and LGPL-licensed programs in it, for no more than the cost of physically providing it, from:
+
+    https://github.com/jgm240/LintabOS/issues  (open an issue titled "Source request")
+
+The source packages are the Debian source packages with the versions listed in `live/filesystem.packages`
+(Debian 13 "trixie" plus `trixie-backports`), and the LintabOS build files are the `live/` directory and
+scripts of this project. `scripts/fetch-sources.sh` downloads exactly that set.

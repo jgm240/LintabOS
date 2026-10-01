@@ -1,0 +1,3 @@
+# The 11IAN8's internal storage is UFS on an Intel PCI controller.
+ufshcd_pci
+ufshcd_core

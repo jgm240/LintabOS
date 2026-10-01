@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=LintabOS Updates
+Comment=Check for and install LintabOS updates from GitHub
+Exec=lintab-update-gui
+Icon=software-update-available-symbolic
+Categories=System;Settings;
+Keywords=update;upgrade;lintabos;release;

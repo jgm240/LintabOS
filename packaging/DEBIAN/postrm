@@ -1,0 +1,12 @@
+#!/bin/sh
+# SPDX-License-Identifier: MIT
+set -e
+case "$1" in
+remove|purge)
+    if command -v systemctl >/dev/null 2>&1; then
+        systemctl --global disable lintab-update-check.timer >/dev/null 2>&1 || true
+    fi
+    if command -v dconf >/dev/null 2>&1; then dconf update || true; fi
+    ;;
+esac
+exit 0

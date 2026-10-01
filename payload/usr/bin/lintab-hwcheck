@@ -1,0 +1,82 @@
+#!/bin/bash
+# SPDX-License-Identifier: MIT
+# lintab-hwcheck: report whether the tablet-specific hardware is working and,
+# when it isn't, say which layer is missing. Safe to run as a normal user.
+#
+# Targets the IdeaPad Duet 3 11IAN8 but the checks are generic.
+
+ok()   { printf '  [ OK ] %s\n' "$*"; }
+warn() { printf '  [WARN] %s\n' "$*"; }
+bad()  { printf '  [FAIL] %s\n' "$*"; }
+hdr()  { printf '\n== %s ==\n' "$*"; }
+
+product=$(cat /sys/class/dmi/id/product_version 2>/dev/null)
+hdr "System"
+echo "  Model:  ${product:-unknown}"
+echo "  Kernel: $(uname -r)"
+case "$product" in
+  *11IAN8*) ok "IdeaPad Duet 3 11IAN8 detected" ;;
+  *)        warn "not an 11IAN8; some checks below may not apply" ;;
+esac
+
+hdr "Screen rotation (accelerometer)"
+if ls /sys/bus/iio/devices/iio:device*/in_accel_x_raw >/dev/null 2>&1; then
+    ok "accelerometer present in IIO ($(cat /sys/bus/iio/devices/iio:device*/name 2>/dev/null | tr '\n' ' '))"
+else
+    bad "no accelerometer in IIO. Check: lsmod | grep -E 'ish|hid_sensor'; journalctl -k | grep -i ish"
+fi
+if busctl --system get-property net.hadess.SensorProxy /net/hadess/SensorProxy net.hadess.SensorProxy HasAccelerometer 2>/dev/null | grep -q true; then
+    ok "iio-sensor-proxy sees it ($(busctl --system get-property net.hadess.SensorProxy /net/hadess/SensorProxy net.hadess.SensorProxy AccelerometerOrientation 2>/dev/null | cut -d' ' -f2-))"
+    echo "       Tilt the tablet and run: monitor-sensor --accel"
+else
+    bad "iio-sensor-proxy reports no accelerometer"
+fi
+
+hdr "Fingerprint reader"
+if lsusb 2>/dev/null | grep -qi '27c6:'; then
+    ok "Goodix reader on USB: $(lsusb | grep -i '27c6:' | head -1 | cut -d' ' -f6-)"
+    if command -v fprintd-list >/dev/null && fprintd-list "$USER" 2>&1 | grep -qi 'found 1 device\|Device at'; then
+        ok "fprintd can use it ($(fprintd-list "$USER" 2>&1 | grep -c 'finger') finger(s) enrolled)"
+        echo "       Enroll: Settings > System > Users > Fingerprint Login"
+    else
+        bad "fprintd does not list a device: $(fprintd-list "$USER" 2>&1 | head -2 | tr '\n' ' ')"
+    fi
+else
+    bad "no Goodix (27c6) USB device. Run: lsusb"
+fi
+
+hdr "Cameras (Intel IPU6 + libcamera)"
+if lspci -nn 2>/dev/null | grep -qi 'multimedia.*8086:462e\|image.*8086:462e'; then ok "IPU6 ISP present (8086:462e)"; else warn "IPU6 PCI device not found"; fi
+if journalctl -k -b 2>/dev/null | grep -qi 'intel-ipu6.*firmware\|ipu6.*failed'; then
+    warn "IPU6 messages in kernel log: $(journalctl -k -b | grep -i ipu6 | tail -2 | tr '\n' ' ')"
+fi
+if command -v cam >/dev/null; then
+    out=$(cam --list 2>&1)
+    if echo "$out" | grep -q '^[0-9]*: '; then
+        ok "libcamera cameras:"; echo "$out" | sed -n 's/^/       /p' | grep -v 'INFO\|WARN'
+    else
+        bad "libcamera found no cameras. Sensor driver or libcamera support missing for this model."
+        echo "       $(journalctl -k -b | grep -iE 'ov[0-9]|hi[0-9]+|imx|ipu-bridge|int3472' | tail -3 | tr '\n' ' ')"
+    fi
+else
+    bad "libcamera tools not installed"
+fi
+
+hdr "LEDs"
+if [ -n "$(ls -A /sys/class/leds 2>/dev/null)" ]; then
+    ok "kernel exposes: $(ls /sys/class/leds | tr '\n' ' ')"
+else
+    warn "no /sys/class/leds entries (the camera privacy LED is driven by the camera driver while streaming)"
+fi
+
+hdr "On-screen keyboard"
+if [ "$(gsettings get org.gnome.desktop.a11y.applications screen-keyboard-enabled 2>/dev/null)" = true ]; then
+    ok "GNOME on-screen keyboard is enabled"
+else
+    warn "on-screen keyboard is off: Settings > Accessibility > Typing > Screen Keyboard"
+fi
+
+hdr "Storage / firmware"
+lsblk -dno NAME,SIZE,TRAN,MODEL 2>/dev/null | sed 's/^/  /'
+[ -d /sys/firmware/efi ] && ok "UEFI boot" || bad "not booted via UEFI"
+echo

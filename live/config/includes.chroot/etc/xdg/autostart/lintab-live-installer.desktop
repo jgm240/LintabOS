@@ -1,0 +1,6 @@
+[Desktop Entry]
+Type=Application
+Name=LintabOS installer (live session)
+Exec=sh -c 'test -d /run/live/medium && exec lintab-installer-launch'
+X-GNOME-Autostart-Delay=4
+NoDisplay=true

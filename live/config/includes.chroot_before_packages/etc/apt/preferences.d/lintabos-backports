@@ -1,0 +1,20 @@
+# The IPU6 camera, UFS and sensor-hub support on the Duet 3 11IAN8 needs a
+# newer kernel and camera stack than Debian 13 stable ships. Pull exactly those
+# from trixie-backports and keep them updated from there.
+Package: linux-image-* linux-headers-* linux-kbuild-* linux-libc-dev linux-base
+Pin: release n=trixie-backports
+Pin-Priority: 900
+
+Package: libcamera* pipewire* libpipewire* gstreamer1.0-libcamera gstreamer1.0-pipewire wireplumber libwireplumber* gir1.2-wp-* libspa*
+Pin: release n=trixie-backports
+Pin-Priority: 900
+
+Package: firmware-* intel-microcode amd64-microcode
+Pin: release n=trixie-backports
+Pin-Priority: 900
+
+# polkitd "recommends any polkit agent"; with backports visible apt picked
+# Hyprland's. GNOME Shell ships its own agent, so keep these out entirely.
+Package: hyprpolkitagent libhypr* qml6-module-org-hyprland-style
+Pin: release n=trixie-backports
+Pin-Priority: -1

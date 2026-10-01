@@ -1,0 +1,35 @@
+#!/bin/sh
+# SPDX-License-Identifier: MIT
+# Runs inside the image chroot after all packages are installed.
+set -e
+
+# Branding
+LINTABOS_VERSION=$(cat /usr/share/lintabos/VERSION 2>/dev/null || echo 0)
+cat > /etc/os-release <<OSR
+PRETTY_NAME="LintabOS $LINTABOS_VERSION (based on Debian GNU/Linux 13)"
+NAME="LintabOS"
+VERSION_ID="$LINTABOS_VERSION"
+VERSION="$LINTABOS_VERSION"
+VERSION_CODENAME=trixie
+ID=lintabos
+ID_LIKE=debian
+HOME_URL="https://github.com/jgm240/LintabOS"
+OSR
+echo "LintabOS \\n \\l" > /etc/issue
+echo "LintabOS" > /etc/issue.net
+
+# GNOME / GDM defaults (dconf system databases)
+dconf update
+
+# Icons installed by the image (installer, logo)
+gtk-update-icon-cache -f /usr/share/icons/hicolor 2>/dev/null || true
+
+# Services
+systemctl enable gdm3.service NetworkManager.service bluetooth.service \
+                 power-profiles-daemon.service thermald.service 2>/dev/null || true
+
+# Flathub, so GNOME Software has apps to offer on first boot
+flatpak remote-add --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo 2>/dev/null || true
+
+# Plymouth: the LintabOS splash (not desktop-base's Debian-branded one)
+plymouth-set-default-theme -R lintabos 2>/dev/null || true
