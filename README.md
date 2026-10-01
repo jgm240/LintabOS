@@ -210,7 +210,8 @@ read from upstream sources and other people's probes, so treat them as expected-
   are not Windows-made. Windows' own BitLocker variants (4K-sector drives, "used space only" encryption, Elephant
   diffuser on older volumes) are handled by dislocker for reading; the in-place decryption has only run on the
   synthetic 512-byte-sector volumes. Whether Windows boots afterwards is untested.
-- The ISO boots in UEFI under QEMU; **it has not yet been booted on the tablet**.
+- The ISO boots in UEFI under QEMU, reaches the GNOME desktop and starts the installer by itself; **it has not yet been
+  booted on the tablet**. The GRUB menu of the live USB currently shows GRUB's default look instead of the LintabOS theme (cosmetic).
 
 Also supported in principle: the **10IGL5** (Celeron/Pentium, eMMC). It has no fingerprint reader and
 a different camera/sensor stack (the kernel already carries its panel-rotation quirk), so only the
