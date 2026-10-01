@@ -3,6 +3,9 @@
 # live-build configuration for LintabOS (Debian 13 "trixie", amd64, UEFI).
 set -e
 
+# NOTE: --cache-indices must stay false. With it on, live-build restores cached apt indexes and never refreshes them
+# after adding the local package repository (config/packages.chroot), so lintabos-core can't be found.
+
 lb config noauto \
     --distribution trixie \
     --architectures amd64 \
@@ -19,7 +22,7 @@ lb config noauto \
     --memtest none \
     --win32-loader false \
     --firmware-chroot false --firmware-binary false \
-    --cache true --cache-indices true --cache-packages true --cache-stages "bootstrap" \
+    --cache true --cache-indices false --cache-packages true --cache-stages "bootstrap" \
     --chroot-squashfs-compression-type zstd \
     --chroot-squashfs-compression-level 15 \
     --iso-application "LintabOS" \
