@@ -57,7 +57,10 @@ jobs:
           xorriso -osirrox on -indev out/lintabos-amd64.iso -extract /live/filesystem.packages /tmp/pk.txt >/dev/null 2>&1
           grep -P "^lintabos-core\t$VERSION$" /tmp/pk.txt
           grep -P "^dislocker\t" /tmp/pk.txt
-          xorriso -indev out/lintabos-amd64.iso -find /boot/grub/efi.img /live/vmlinuz-7.1.13+deb13-amd64 2>/dev/null | grep -c efi.img
+          # the UEFI boot image and the kernel must be on the medium
+          xorriso -indev out/lintabos-amd64.iso -find /boot/grub -name efi.img 2>/dev/null | grep -q efi.img
+          xorriso -indev out/lintabos-amd64.iso -find /live -name 'vmlinuz-*' 2>/dev/null | grep -q vmlinuz
+          echo "boot image and kernel present"
 
       - name: Attach the ISO and refresh SHA256SUMS
         env:
