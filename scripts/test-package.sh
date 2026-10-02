@@ -28,7 +28,7 @@ docker run --rm -v "$PWD:/lintab" -w /lintab lintabos-builder bash -euo pipefail
            /etc/xdg/autostart/lintab-tablet-mode-xfce.desktop \
            /usr/bin/lintab-uninstall /usr/bin/lintab-uninstall-gui /usr/bin/lintab-uninstall-launch /usr/bin/lintab-hwreport \
            /usr/bin/lintab-extras /usr/bin/lintab-reading-mode /usr/bin/lintab-battery /usr/bin/lintab-battery-gui \
-           /usr/bin/lintab-tablet-settings /usr/libexec/lintab/install-waydroid /usr/libexec/lintab/battery-limit \
+           /usr/bin/lintab-tablet-settings /usr/bin/lintab-wifi-fix /usr/libexec/lintab/install-waydroid /usr/libexec/lintab/battery-limit \
            /usr/lib/systemd/system/lintab-battery-limit.service /usr/share/polkit-1/actions/org.lintabos.extras.policy \
            /usr/share/polkit-1/actions/org.lintabos.battery.policy /usr/share/applications/lintab-hwreport.desktop \
            /usr/share/applications/lintab-extras.desktop /usr/share/applications/lintab-battery.desktop \
@@ -58,7 +58,7 @@ docker run --rm -v "$PWD:/lintab" -w /lintab lintabos-builder bash -euo pipefail
   lintab-update status
   python3 - <<PY
 import sys; sys.path.insert(0, "/usr/lib/python3/dist-packages")
-import lintab.update, lintab.update_gui, lintab.bitlocker_gui, lintab.gui, lintab.desktops, lintab.touchsetup, lintab.xfce_rotate, lintab.uninstall, lintab.uninstall_gui, lintab.hwreport, lintab.extras, lintab.comfort, lintab.battery, lintab.battery_gui, lintab.tablet_gui
+import lintab.update, lintab.update_gui, lintab.bitlocker_gui, lintab.gui, lintab.desktops, lintab.touchsetup, lintab.xfce_rotate, lintab.uninstall, lintab.uninstall_gui, lintab.hwreport, lintab.extras, lintab.comfort, lintab.battery, lintab.battery_gui, lintab.tablet_gui, lintab.wifi
 print("ok   python modules import (GTK stack present)")
 PY
   echo "== upgrade $V -> $NEXT"

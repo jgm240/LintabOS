@@ -38,3 +38,4 @@ payload/usr/bin/lintab-battery
 payload/usr/bin/lintab-battery-gui
 payload/usr/bin/lintab-uninstall-gui
 payload/usr/bin/lintab-uninstall-launch
+payload/usr/bin/lintab-wifi-fix

@@ -179,7 +179,7 @@ IPU6 → libcamera, LEDs, OSK) and says which one is missing.
 
 These were reported by someone running LintabOS on a real IdeaPad Duet 3 and are **not fixed yet**; the cause of each is still unknown:
 
-- **Wi-Fi disappeared.**
+- **Wi-Fi disappeared.** `sudo lintab-wifi-fix` (0.3.0) undoes everything in software that can stop Wi-Fi (rfkill blocks, a disabled radio, stopped or masked services, a driver that didn't load) and reports config or missing firmware it can't change on its own. It can't help if the Wi-Fi chip isn't detected at all.
 - **Fingerprint login doesn't work.**
 - **Pressing the power button or closing the folio leaves the tablet dead until it is force-restarted.** Real hibernation can't work (LintabOS uses zram only, no swap file), so this is most likely suspend that never resumes. Until it is fixed, `sudo systemctl mask sleep.target suspend.target hibernate.target hybrid-sleep.target` and setting the power button to "interactive" keep the tablet from sleeping at all.
 
