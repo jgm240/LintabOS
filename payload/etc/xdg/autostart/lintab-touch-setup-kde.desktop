@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=LintabOS touch setup (KDE)
+Exec=lintab-touch-setup kde
+OnlyShowIn=KDE;
+NoDisplay=true
+X-GNOME-Autostart-enabled=true

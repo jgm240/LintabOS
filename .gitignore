@@ -27,3 +27,5 @@ payload/usr/bin/lintab-windows-files
 payload/usr/bin/lintab-boot-menu
 payload/usr/share/lintabos/refind/
 payload/usr/share/lintabos/sounds/
+payload/usr/bin/lintab-touch-setup
+payload/usr/bin/lintab-xfce-rotate

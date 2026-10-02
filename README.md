@@ -27,6 +27,7 @@ It boots from a USB stick, installs with a touch-friendly installer, and can
 | School mode | **School Mode** app / `lintab-school-mode on`: blocks the camera drivers, makes every `/dev/video*` and `/dev/media*` node unopenable, and de-authorizes USB webcams. Turning it on needs no password; **turning it off needs an administrator's password** (polkit). `lintab-school-mode verify` checks that no camera is reachable |
 | Windows files in the sidebar | When installed next to Windows, the Windows drive shows as **Windows** in Files (read-only, mounted on first click, via `/etc/fstab` + `x-gvfs-show`). `lintab-windows-files enable\|disable [--read-write]` for existing installs; read-write is refused if Windows left the drive unclean. A BitLocker drive appears after **Unlock BitLocker Drive** |
 | Touch boot menu | **Touch Boot Menu** app / `lintab-boot-menu enable`: installs rEFInd next to GRUB with big LintabOS and Windows icons and touch enabled. Own boot entry, first in line; GRUB and Windows are not touched and `disable` undoes it. **Refuses while Secure Boot is on**; touch also depends on the tablet's firmware |
+| KDE Plasma and Xfce (optional) | Switch them on in the installer's account page; they are **downloaded during setup** (about 450 MB and 70 MB; the tablet must be online) from Debian after GRUB is installed, so a failed download can never cost you the boot. GDM stays the login screen and GNOME the default; pick the others from the gear icon. **Touch**: Plasma gets the Maliit on-screen keyboard and a 56 px panel (KWin already rotates from the accelerometer); Xfce gets a 48 px panel, bigger cursor and interface, the Onboard keyboard, and `lintab-xfce-rotate` (xrandr + touch-matrix rotation, since Xfce has none). `lintab-tablet-mode` switches each desktop's keyboard when the folio attaches or detaches |
 | Word, Excel, PowerPoint, OneDrive, Teams | Microsoft's own **web apps** in their own windows (Chromium app mode, one shared sign-in), plus *Connect OneDrive to Files* (GNOME Online Accounts). **There is no native Office or Teams for Linux.** The optional **Office Pack** downloads LibreOffice (edits .docx/.xlsx/.pptx offline) and the unofficial Teams for Linux from Flathub |
 
 ## Download
@@ -212,8 +213,12 @@ read from upstream sources and other people's probes, so treat them as expected-
 - **GRUB has no touch input**: the default boot menu needs the folio keyboard (or Bluetooth keyboard paired
   in firmware). The optional touch boot menu (rEFInd) only works with Secure Boot off, and whether the tablet's firmware
   passes touch to it is untested.
+- **KDE and Xfce**: the install order, GDM-stays-default guard, failure handling, DNS handling, touch settings, rotation maths and
+  per-desktop keyboard commands are tested (`tests/test_desktops.py`); the Xfce xfconf keys and Onboard's gsettings keys were checked
+  against the real packages in Debian 13, and both package lists resolve there. **Not tested**: an actual KDE or Xfce session on the
+  tablet, Plasma's virtual-keyboard D-Bus switch, and whether Plasma's panel script takes effect on first login.
 - **0.2.0 features** (tablet mode, snap sound, school mode, Windows sidebar, touch boot menu, Microsoft 365 apps): the
-  decision logic and generated files are tested (`./scripts/test-features.sh`, 24 tests; school-mode udev rules checked with
+  decision logic and generated files are tested (`./scripts/test-features.sh`, 46 tests; school-mode udev rules checked with
   `udevadm verify`; the boot menu run against a fake firmware and ESP). Not tested on hardware: whether the folio's
   detach/attach is seen as a keyboard appearing and disappearing, whether a camera is really dead in school mode on the Duet,
   rEFInd's look and touch on the tablet, and the Microsoft web apps (they need a Microsoft account and depend on Microsoft's sites).

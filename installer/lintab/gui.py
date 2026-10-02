@@ -20,7 +20,7 @@ gi.require_version("Gtk", "4.0")
 gi.require_version("Adw", "1")
 from gi.repository import Adw, Gdk, GLib, Gtk  # noqa: E402
 
-from . import bitlocker, bitlocker_decrypt, disks, install as installmod, plan as planmod  # noqa: E402
+from . import bitlocker, bitlocker_decrypt, desktops as desktopsmod, disks, install as installmod, plan as planmod  # noqa: E402
 from .gui_bitlocker import BitLockerStep  # noqa: E402
 from .disks import GiB  # noqa: E402
 
@@ -360,6 +360,16 @@ class InstallerWindow(Adw.ApplicationWindow):
         for w in (self.e_name, self.e_user, self.e_pass, self.e_pass2, self.e_host, self.e_tz, self.s_auto):
             group.add(w)
         box.append(group)
+        extras = Adw.PreferencesGroup(
+            title="More desktops (optional)",
+            description="GNOME is always installed and stays the default. Anything you turn on here is downloaded during "
+                        "setup, so the tablet must be online; pick it from the gear icon on the login screen.")
+        self.s_desktops = {}
+        for key, desktop in desktopsmod.DESKTOPS.items():
+            row = Adw.SwitchRow(title=desktop.label, subtitle=f"Touch-ready. Downloads about {desktop.approx_mb} MB.")
+            self.s_desktops[key] = row
+            extras.add(row)
+        box.append(extras)
         self.nav.push(self._page("Your account", "account", box, self._footer("Continue", self._go_summary)))
 
     def _suggest_user(self, full: str) -> None:
@@ -394,8 +404,13 @@ class InstallerWindow(Adw.ApplicationWindow):
                 password=self.e_pass.get_text(),
                 hostname=self.e_host.get_text().strip() or "lintab",
                 timezone=self.e_tz.get_text().strip() or "UTC",
-                autologin=self.s_auto.get_active())
+                autologin=self.s_auto.get_active(),
+                desktops=tuple(k for k, row in self.s_desktops.items() if row.get_active()))
             self.cfg.validate()
+            if self.cfg.desktops and not desktopsmod.network_available():
+                raise installmod.InstallError(
+                    "KDE Plasma and Xfce are downloaded during setup, but this tablet can't reach the internet. "
+                    "Connect to Wi-Fi (top-right menu), or turn the extra desktops off.")
             self.plan = self._build_plan()
         except (installmod.InstallError, planmod.PlanError) as exc:
             cfg_error = str(exc)
@@ -408,6 +423,9 @@ class InstallerWindow(Adw.ApplicationWindow):
         group = Adw.PreferencesGroup(title="Ready to install", description=f"Disk: {self.scan.disk.display_name}")
         for line in self.plan.summary:
             group.add(Adw.ActionRow(title=line, title_lines=3))
+        if self.cfg.desktops:
+            group.add(Adw.ActionRow(
+                title=f"Also downloading: {desktopsmod.download_summary(list(self.cfg.desktops))}", title_lines=3))
         box.append(group)
         self.confirm = None
         destructive = self.mode == MODE_WIPE
@@ -442,8 +460,8 @@ class InstallerWindow(Adw.ApplicationWindow):
         def work() -> None:
             try:
                 planmod.apply_plan(self.plan, progress=lambda i, n, d: set_progress(0.10 * i / n, d))
-                installmod.install(self.cfg, lambda f, m: set_progress(0.10 + 0.90 * f, m))
-                GLib.idle_add(self._install_done, None)
+                warnings = installmod.install(self.cfg, lambda f, m: set_progress(0.10 + 0.90 * f, m))
+                GLib.idle_add(self._install_done, None, warnings)
             except Exception as exc:  # noqa: BLE001 - shown to the user
                 GLib.idle_add(self._install_done, str(exc))
 
@@ -454,7 +472,7 @@ class InstallerWindow(Adw.ApplicationWindow):
         self.progress_label.set_text(msg)
         return False
 
-    def _install_done(self, error: Optional[str]) -> bool:
+    def _install_done(self, error: Optional[str], warnings: Optional[list[str]] = None) -> bool:
         if error:
             status = Adw.StatusPage(title="Installation failed", icon_name="dialog-error-symbolic", description=error)
             status.add_css_class("compact")
@@ -463,7 +481,8 @@ class InstallerWindow(Adw.ApplicationWindow):
         else:
             status = Adw.StatusPage(title="LintabOS is installed", icon_name="emblem-ok-symbolic",
                                     description="Remove the USB stick and restart. In the boot menu, choose "
-                                                "LintabOS, or “Boot into Windows” to go back to Windows.")
+                                                "LintabOS, or “Boot into Windows” to go back to Windows."
+                                                + ("\n\nNote:\n" + "\n".join(warnings) if warnings else ""))
             self.nav.push(self._page("Done", "done", status, self._footer("Restart now", _reboot), can_pop=False))
         return False
 

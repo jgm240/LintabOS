@@ -19,6 +19,8 @@ Foundation.
 - Chromium is a project of Google and contributors; the browser is Debian's unmodified Chromium package, used only to
   show the web apps. Nintendo, Joy-Con and Switch are trademarks of Nintendo; they are not used in LintabOS, whose
   keyboard snap sound is synthesised from scratch.
+- KDE and Plasma are trademarks of KDE e.V.; Xfce is a trademark of its developers. Neither desktop is shipped in the ISO:
+  the installer downloads Debian's unmodified packages only when you choose them.
 - Lenovo and IdeaPad are trademarks of Lenovo. They are named only to say which hardware LintabOS is built for.
 - Firefox is a trademark of the Mozilla Foundation. The browser is Debian's unmodified Firefox ESR package.
 - GNOME is a trademark of the GNOME Foundation. Intel is a trademark of Intel Corporation.
@@ -37,6 +39,9 @@ Foundation.
 
 - The optional touch boot menu uses **rEFInd** by Roderick W. Smith (GPL-3.0-or-later, with BSD/FreeBSD-licensed parts;
   installed from Debian's `refind` package on request). Its Windows icon comes from that package.
+
+- The optional Xfce touch setup uses **Onboard** (GPL-3.0-or-later) as its on-screen keyboard and the optional KDE setup uses
+  **Maliit** (LGPL-2.1); both are Debian packages downloaded on request, with their own license texts.
 
 ## License of LintabOS's own code
 

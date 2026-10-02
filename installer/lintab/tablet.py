@@ -7,8 +7,8 @@ mode the person is in:
 * keyboard attached  -> laptop mode: the on-screen keyboard is turned off;
 * keyboard detached  -> tablet mode: the on-screen keyboard is turned on.
 
-GNOME's own screen rotation keeps working in both modes (it follows the accelerometer). Settings are changed through
-gsettings for the logged-in user; the background service ``lintab-tablet-mode run`` watches udev and reapplies them
+It works in GNOME (gsettings), KDE Plasma (KWin's virtual keyboard) and Xfce (Onboard). Screen rotation follows the
+accelerometer in every desktop and is not touched here. Settings are changed for the logged-in user; the background service ``lintab-tablet-mode run`` watches udev and reapplies them
 whenever a keyboard appears or disappears. ``lintab-tablet-mode tablet|laptop|auto`` overrides the automatic choice.
 """
 
@@ -70,12 +70,44 @@ def write_mode(mode: str, path: str = CONF) -> None:
         f.write(f"# lintab-tablet-mode: auto = follow the keyboard, tablet or laptop = force a mode\nmode = {mode}\n")
 
 
-def apply_state(state: str, run: Callable[[list[str]], object] = subprocess.run) -> list[list[str]]:
-    """Switch GNOME's on-screen keyboard for the given state. Returns the commands issued (for tests)."""
-    osk = "true" if state == "tablet" else "false"
-    commands = [["gsettings", "set", "org.gnome.desktop.a11y.applications", "screen-keyboard-enabled", osk]]
+def detect_desktop(env: Optional[dict] = None) -> str:
+    """"kde", "xfce" or "gnome" (the default) from XDG_CURRENT_DESKTOP, which holds a colon-separated list."""
+    names = (env if env is not None else os.environ).get("XDG_CURRENT_DESKTOP", "").upper().split(":")
+    if "KDE" in names:
+        return "kde"
+    if "XFCE" in names:
+        return "xfce"
+    return "gnome"
+
+
+def osk_commands(state: str, desktop: str) -> list[list[str]]:
+    """The commands that switch the on-screen keyboard of ``desktop`` for ``state`` ("tablet" shows it, "laptop" hides it)."""
+    flag = "true" if state == "tablet" else "false"
+    if desktop == "kde":
+        return [
+            ["kwriteconfig6", "--file", "kwinrc", "--group", "Wayland", "--key", "VirtualKeyboardEnabled", flag],
+            ["dbus-send", "--session", "--type=method_call", "--dest=org.kde.KWin", "/VirtualKeyboard",
+             "org.freedesktop.DBus.Properties.Set", "string:org.kde.kwin.VirtualKeyboard", "string:enabled",
+             f"variant:boolean:{flag}"],
+        ]
+    if desktop == "xfce":
+        commands = [["gsettings", "set", "org.onboard.auto-show", "enabled", flag]]
+        if state != "tablet":      # also hide it if it is on screen right now
+            commands.append(["dbus-send", "--session", "--type=method_call", "--dest=org.onboard.Onboard",
+                             "/org/onboard/Onboard/Keyboard", "org.onboard.Onboard.Keyboard.Hide"])
+        return commands
+    return [["gsettings", "set", "org.gnome.desktop.a11y.applications", "screen-keyboard-enabled", flag]]
+
+
+def apply_state(state: str, run: Callable[[list[str]], object] = subprocess.run, desktop: Optional[str] = None
+                ) -> list[list[str]]:
+    """Switch the running desktop's on-screen keyboard for the given state. Returns the commands issued (for tests)."""
+    commands = osk_commands(state, desktop or detect_desktop())
     for command in commands:
-        run(command)
+        try:
+            run(command)
+        except FileNotFoundError:
+            pass            # that desktop's tool isn't installed; nothing to switch
     return commands
 
 

@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=LintabOS touch setup (Xfce)
+Exec=lintab-touch-setup xfce
+OnlyShowIn=XFCE;
+NoDisplay=true
+X-GNOME-Autostart-enabled=true

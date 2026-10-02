@@ -22,7 +22,10 @@ docker run --rm -v "$PWD:/lintab" -w /lintab lintabos-builder bash -euo pipefail
            /usr/share/polkit-1/actions/org.lintabos.school-mode.policy /usr/lib/systemd/user/lintab-tablet-mode.service \
            /usr/share/lintabos/sounds/keyboard-attached.wav /usr/share/lintabos/sounds/keyboard-detached.wav \
            /usr/share/lintabos/refind/lintabos.png /usr/share/lintabos/refind/background.png \
-           /usr/share/applications/lintab-word.desktop /usr/share/applications/lintab-teams.desktop; do
+           /usr/share/applications/lintab-word.desktop /usr/share/applications/lintab-teams.desktop \
+           /usr/bin/lintab-touch-setup /usr/bin/lintab-xfce-rotate /etc/xdg/autostart/lintab-touch-setup-xfce.desktop \
+           /etc/xdg/autostart/lintab-touch-setup-kde.desktop /etc/xdg/autostart/lintab-xfce-rotate.desktop \
+           /etc/xdg/autostart/lintab-tablet-mode-xfce.desktop; do
     [ -e "$f" ] && echo "ok   $f" || { echo "MISSING $f"; exit 1; }
   done
   echo "== postinst effects"
@@ -34,7 +37,7 @@ docker run --rm -v "$PWD:/lintab" -w /lintab lintabos-builder bash -euo pipefail
   echo "== new executables are executable, desktop files are valid, services enabled"
   for f in /usr/bin/lintab-webapp /usr/libexec/lintab/school-mode-on /usr/libexec/lintab/school-mode-off; do [ -x "$f" ] || { echo "NOT EXECUTABLE $f"; exit 1; }; done
   apt-get install -y -qq --no-install-recommends desktop-file-utils >/dev/null 2>&1
-  desktop-file-validate /usr/share/applications/lintab-*.desktop && echo "ok   desktop files validate"
+  desktop-file-validate /usr/share/applications/lintab-*.desktop /etc/xdg/autostart/lintab-*.desktop && echo "ok   desktop files validate"
   ls /etc/systemd/user/graphical-session.target.wants/lintab-tablet-mode.service >/dev/null && echo "ok   tablet-mode service enabled for all users"
   lintab-tablet-mode status || true
   lintab-school-mode status
@@ -43,7 +46,7 @@ docker run --rm -v "$PWD:/lintab" -w /lintab lintabos-builder bash -euo pipefail
   lintab-update status
   python3 - <<PY
 import sys; sys.path.insert(0, "/usr/lib/python3/dist-packages")
-import lintab.update, lintab.update_gui, lintab.bitlocker_gui, lintab.gui
+import lintab.update, lintab.update_gui, lintab.bitlocker_gui, lintab.gui, lintab.desktops, lintab.touchsetup, lintab.xfce_rotate
 print("ok   python modules import (GTK stack present)")
 PY
   echo "== upgrade $V -> $NEXT"

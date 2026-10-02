@@ -15,6 +15,7 @@ import subprocess
 from dataclasses import dataclass
 from typing import Callable, Optional
 
+from . import desktops as desktopsmod
 from .disks import DiskError
 from .plan import Plan, resolve_partuuid
 
@@ -45,6 +46,7 @@ class InstallConfig:
     locale: str = "en_US.UTF-8"
     keyboard_layout: str = "us"
     autologin: bool = False
+    desktops: tuple[str, ...] = ()      # extra desktops to download: "kde", "xfce"
 
     def validate(self) -> None:
         if not re.fullmatch(r"[a-z_][a-z0-9_-]{0,31}", self.username):
@@ -57,6 +59,10 @@ class InstallConfig:
             raise InstallError(f"Unknown time zone {self.timezone!r}.")
         if ":" in self.fullname or "\n" in self.fullname:
             raise InstallError("The full name can't contain ':' or line breaks.")
+        try:
+            desktopsmod.parse_selection(list(self.desktops))
+        except ValueError as exc:
+            raise InstallError(str(exc)) from None
 
 
 def _sh(argv: list[str], **kw) -> subprocess.CompletedProcess:
@@ -71,6 +77,12 @@ def _chroot(argv: list[str], input: Optional[str] = None, env: Optional[dict] = 
     _sh(["chroot", TARGET, *argv], input=input, env=full_env)
 
 
+def _chroot_stream(argv: list[str]) -> subprocess.Popen:
+    env = {**os.environ, "DEBIAN_FRONTEND": "noninteractive", "LC_ALL": "C.UTF-8"}
+    return subprocess.Popen(["chroot", TARGET, *argv], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
+                            bufsize=1, env=env)
+
+
 def find_live_rootfs() -> str:
     for path in LIVE_ROOTFS_CANDIDATES:
         if os.path.isdir(path):
@@ -82,8 +94,10 @@ def _uuid(dev: str) -> str:
     return _sh(["blkid", "-s", "UUID", "-o", "value", dev]).stdout.strip()
 
 
-def install(cfg: InstallConfig, progress: Progress) -> None:
+def install(cfg: InstallConfig, progress: Progress) -> list[str]:
+    """Install LintabOS. Returns warnings (things that didn't work but don't affect the base system)."""
     cfg.validate()
+    warnings: list[str] = []
     if not os.path.isdir("/sys/firmware/efi"):
         raise InstallError("This computer is not booted in UEFI mode. LintabOS installs in UEFI mode only; "
                            "restart and boot the USB stick from its UEFI entry.")
@@ -121,11 +135,17 @@ def install(cfg: InstallConfig, progress: Progress) -> None:
         progress(0.93, "Installing the GRUB bootloader")
         _install_grub(cfg)
 
-        progress(0.98, "Saving a copy of your old partition table")
+        if cfg.desktops:
+            # After GRUB: the base system already boots, so a failed download can only cost the extra desktops.
+            warnings += desktopsmod.install_desktops(
+                list(cfg.desktops), TARGET, _chroot, _chroot_stream, progress, lo=0.94, hi=0.985)
+
+        progress(0.99, "Saving a copy of your old partition table")
         if cfg.plan.backup_path and os.path.exists(cfg.plan.backup_path):
             os.makedirs(f"{TARGET}/var/lib/lintab", exist_ok=True)
             shutil.copy(cfg.plan.backup_path, f"{TARGET}/var/lib/lintab/partition-table-before-install.sfdisk")
         progress(1.0, "Finishing up")
+        return warnings
     finally:
         subprocess.run(["sync"])
         for mnt in mounted:

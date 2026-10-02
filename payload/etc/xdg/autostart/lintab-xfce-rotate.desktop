@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=LintabOS screen rotation (Xfce)
+Exec=lintab-xfce-rotate
+OnlyShowIn=XFCE;
+NoDisplay=true
+X-GNOME-Autostart-enabled=true

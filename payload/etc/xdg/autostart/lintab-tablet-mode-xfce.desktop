@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=LintabOS tablet mode (Xfce)
+Exec=lintab-tablet-mode run
+OnlyShowIn=XFCE;
+NoDisplay=true
+X-GNOME-Autostart-enabled=true
