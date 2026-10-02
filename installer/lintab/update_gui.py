@@ -50,6 +50,11 @@ class UpdateWindow(Adw.ApplicationWindow):
         self.update_button.connect("clicked", lambda _b: self._apply())
         box.append(self.update_button)
 
+        self.rollback_button = Gtk.Button(label="", halign=Gtk.Align.CENTER, visible=False)
+        self.rollback_button.add_css_class("pill")
+        self.rollback_button.connect("clicked", lambda _b: self._rollback())
+        box.append(self.rollback_button)
+
         self.check_button = Gtk.Button(label="Check again", halign=Gtk.Align.CENTER)
         self.check_button.add_css_class("pill")
         self.check_button.connect("clicked", lambda _b: self._check())
@@ -79,6 +84,8 @@ class UpdateWindow(Adw.ApplicationWindow):
     def _checked(self, info: dict) -> bool:
         self.check_button.set_sensitive(True)
         self.row_installed.set_subtitle(info.get("installed") or "unknown")
+        self.rollback_button.set_visible(bool(info.get("rollback")))
+        self.rollback_button.set_label(f"Go back to {info.get('rollback')}")
         if info.get("error"):
             self.row_latest.set_subtitle("unknown")
             self.status.set_text(info["error"])
@@ -105,6 +112,24 @@ class UpdateWindow(Adw.ApplicationWindow):
             GLib.idle_add(self._applied, proc.returncode, (proc.stdout + proc.stderr).strip())
 
         threading.Thread(target=work, daemon=True).start()
+
+    def _rollback(self) -> None:
+        self.rollback_button.set_sensitive(False)
+        self.status.set_text("Going back to the earlier version… (enter your password when asked)")
+
+        def work() -> None:
+            proc = subprocess.run(["pkexec", TOOL, "rollback", "--yes"], capture_output=True, text=True)
+            GLib.idle_add(self._rolled_back, proc.returncode, (proc.stdout + proc.stderr).strip())
+
+        threading.Thread(target=work, daemon=True).start()
+
+    def _rolled_back(self, rc: int, output: str) -> bool:
+        self.rollback_button.set_sensitive(True)
+        self.status.set_text("Rolled back. Restart the tablet to be sure every part is using it." if rc == 0
+                             else (output.replace("error: ", "") or "Rolling back did not work."))
+        if rc == 0:
+            self._check()
+        return False
 
     def _applied(self, rc: int, output: str) -> bool:
         self.update_button.set_sensitive(True)

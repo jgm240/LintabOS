@@ -7,6 +7,10 @@ mode the person is in:
 * keyboard attached  -> laptop mode: the on-screen keyboard is turned off;
 * keyboard detached  -> tablet mode: the on-screen keyboard is turned on.
 
+Tablet mode only ever switches the on-screen keyboard; it never disables the folio. The **assist** mode ("Folio not
+working", for the many folios with a few dead keys) leaves the on-screen keyboard on even while the folio is attached, so
+you can type with the keys that work and tap the ones that don't.
+
 It works in GNOME (gsettings), KDE Plasma (KWin's virtual keyboard) and Xfce (Onboard). Screen rotation follows the
 accelerometer in every desktop and is not touched here. Settings are changed for the logged-in user; the background service ``lintab-tablet-mode run`` watches udev and reapplies them
 whenever a keyboard appears or disappears. ``lintab-tablet-mode tablet|laptop|auto`` overrides the automatic choice.
@@ -23,6 +27,7 @@ import time
 from typing import Callable, Iterable, Optional
 
 CONF = os.path.join(os.environ.get("XDG_CONFIG_HOME", os.path.expanduser("~/.config")), "lintabos", "tablet-mode.conf")
+MODES = ("auto", "tablet", "laptop", "assist")
 SETTLE_SECONDS = 1.5  # the pogo connection flickers when the folio is attached or detached
 
 # Names of input nodes that report ID_INPUT_KEYBOARD but are not something you type on.
@@ -46,7 +51,9 @@ def keyboard_attached(devices: Iterable[dict[str, str]]) -> bool:
 
 
 def decide(mode: str, devices: Iterable[dict[str, str]]) -> str:
-    """Return "tablet" or "laptop" for the configured mode ("auto", "tablet" or "laptop")."""
+    """Return "tablet" or "laptop" for the configured mode. "assist" means on-screen keyboard on, folio or not."""
+    if mode == "assist":
+        return "tablet"
     if mode in ("tablet", "laptop"):
         return mode
     return "laptop" if keyboard_attached(devices) else "tablet"
@@ -57,7 +64,7 @@ def read_mode(path: str = CONF) -> str:
         with open(path) as f:
             for line in f:
                 key, _, value = line.partition("=")
-                if key.strip() == "mode" and value.strip() in ("auto", "tablet", "laptop"):
+                if key.strip() == "mode" and value.strip() in MODES:
                     return value.strip()
     except OSError:
         pass
@@ -67,7 +74,7 @@ def read_mode(path: str = CONF) -> str:
 def write_mode(mode: str, path: str = CONF) -> None:
     os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path, "w") as f:
-        f.write(f"# lintab-tablet-mode: auto = follow the keyboard, tablet or laptop = force a mode\nmode = {mode}\n")
+        f.write(f"# lintab-tablet-mode: auto = follow the keyboard; tablet, laptop = force it; assist = on-screen keyboard always on, folio still works\nmode = {mode}\n")
 
 
 def detect_desktop(env: Optional[dict] = None) -> str:
@@ -124,10 +131,14 @@ def current_devices() -> list[dict[str, str]]:
 SOUND_DIR = "/usr/share/lintabos/sounds"
 
 
-def event_text(attached: bool, state: str) -> tuple[str, str]:
+def event_text(attached: bool, state: str, mode: str = "auto") -> tuple[str, str]:
     """(title, body) of the notification shown when the keyboard is attached or detached."""
     title = "Keyboard Attached" if attached else "Keyboard Detached"
-    body = ("Laptop mode: on-screen keyboard off" if state == "laptop" else "Tablet mode: on-screen keyboard on")
+    if mode == "assist":
+        body = ("Folio assist: the folio keys work and the on-screen keyboard stays on" if attached
+                else "Folio assist: on-screen keyboard on")
+    else:
+        body = ("Laptop mode: on-screen keyboard off" if state == "laptop" else "Tablet mode: on-screen keyboard on")
     return title, body
 
 
@@ -157,8 +168,8 @@ def plan_refresh(mode: str, devices: list[dict[str, str]], last_attached: Option
     return state, attached, event, state != last_state
 
 
-def announce(attached: bool, state: str) -> None:
-    title, body = event_text(attached, state)
+def announce(attached: bool, state: str, mode: str = "auto") -> None:
+    title, body = event_text(attached, state, mode)
     if shutil.which("notify-send"):
         subprocess.run(["notify-send", "-a", "LintabOS", "-i", "input-keyboard-symbolic", title, body],
                        capture_output=True)
@@ -179,11 +190,12 @@ def run_service() -> int:
 
     def refresh() -> None:
         nonlocal last_attached, last_state
-        state, attached, event, apply = plan_refresh(read_mode(), current_devices(), last_attached, last_state)
+        mode = read_mode()
+        state, attached, event, apply = plan_refresh(mode, current_devices(), last_attached, last_state)
         if apply:
             apply_state(state)
         if event is not None:
-            announce(event, state)
+            announce(event, state, mode)
         last_attached, last_state = attached, state
 
     refresh()
@@ -199,11 +211,11 @@ def run_service() -> int:
 
 def main(argv: Optional[list[str]] = None) -> int:
     ap = argparse.ArgumentParser(prog="lintab-tablet-mode", description=__doc__.split("\n\n")[0])
-    ap.add_argument("action", choices=["auto", "tablet", "laptop", "status", "run"], nargs="?", default="status")
+    ap.add_argument("action", choices=[*MODES, "status", "run"], nargs="?", default="status")
     args = ap.parse_args(argv)
     if args.action == "run":
         return run_service()
-    if args.action in ("auto", "tablet", "laptop"):
+    if args.action in MODES:
         write_mode(args.action)
         apply_state(decide(args.action, current_devices()))
         print(f"mode: {args.action}")

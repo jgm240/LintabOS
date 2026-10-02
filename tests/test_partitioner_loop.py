@@ -18,7 +18,7 @@ import pytest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "installer"))
 
-from lintab import disks, plan as planmod  # noqa: E402
+from lintab import bootmenu, disks, plan as planmod, uninstall  # noqa: E402
 from lintab.disks import GiB, MiB  # noqa: E402
 
 pytestmark = pytest.mark.skipif(
@@ -169,3 +169,104 @@ def test_second_shrink_is_refused_until_windows_checked_its_disk(windows_disk):
     d2 = disks.read_disk(windows_disk["loop"])
     with pytest.raises(planmod.PlanError, match="chkdsk"):
         planmod.plan_dualboot(d2, 1 * GiB)
+
+
+# ------------------------------------------------------------- Remove LintabOS ---
+
+def _install_like_the_installer(windows_disk):
+    """Dual-boot partitioning plus what the installer leaves on the ESP."""
+    d = disks.read_disk(windows_disk["loop"])
+    plan = planmod.plan_dualboot(d, 2 * GiB)
+    planmod.apply_plan(plan)
+    esp = windows_disk["parts"][1]
+    mnt = tempfile.mkdtemp()
+    sh("mount", esp, mnt)
+    os.makedirs(f"{mnt}/EFI/LintabOS")
+    open(f"{mnt}/EFI/LintabOS/grubx64.efi", "wb").write(os.urandom(2048))
+    sh("umount", mnt)
+    return plan
+
+
+class FakeFirmware:
+    """Real mount/umount, fake efibootmgr (the container has no EFI variables)."""
+
+    def __init__(self):
+        self.order = ["0003", "0000"]
+        self.entries = {"0000": "Windows Boot Manager", "0003": "LintabOS"}
+
+    def __call__(self, argv):
+        if argv[0] != "efibootmgr":
+            return subprocess.run(argv, capture_output=True, text=True)
+        if argv[1:2] == ["-B"]:
+            self.entries.pop(argv[3], None)
+        elif argv[1:2] == ["-o"]:
+            self.order = argv[2].split(",")
+        text = f"BootOrder: {','.join(self.order)}\n" + "".join(f"Boot{i}* {l}\n" for i, l in self.entries.items())
+        return subprocess.CompletedProcess(argv, 0, text, "")
+
+
+def _windows_has_booted(windows_disk):
+    """Windows runs chkdsk on its first start after a resize and clears the flag; do the same here."""
+    sh("ntfsfix", "-d", windows_disk["parts"][3])
+
+
+def test_remove_lintabos_gives_the_space_back_and_leaves_windows_bootable(windows_disk):
+    loop = windows_disk["loop"]
+    original = {p.number: (p.start, p.size, p.type_guid, p.uuid, p.name) for p in disks.read_disk(loop).partitions}
+    _install_like_the_installer(windows_disk)
+    _windows_has_booted(windows_disk)
+
+    d = disks.read_disk(loop)
+    plan = uninstall.plan_uninstall(d)
+    assert plan.new_windows_size is not None, plan.grow_skipped
+    firmware = FakeFirmware()
+    warnings = uninstall.apply_uninstall(plan, run=firmware)
+    assert warnings == []
+
+    after = {p.number: p for p in disks.read_disk(loop).partitions}
+    assert set(after) == {1, 2, 3, 4}                                                    # the LintabOS partition is gone
+    for n in (1, 2, 4):                                                                  # everything else is untouched
+        assert (after[n].start, after[n].size, after[n].type_guid, after[n].uuid, after[n].name) == original[n]
+    w = after[3]
+    assert (w.start, w.size, w.type_guid, w.uuid, w.name) == original[3]                 # Windows is exactly as big as before
+
+    sh("ntfsresize", "--info", "--force", "--no-progress-bar", w.path)                   # filesystem fills it, consistent
+    sh("ntfsfix", "--no-action", w.path)
+    mnt = tempfile.mkdtemp()
+    sh("ntfs-3g", "-o", "ro", w.path, mnt)
+    try:
+        digest = hashlib.sha256(open(f"{mnt}/Windows/System32/payload.bin", "rb").read()).hexdigest()
+    finally:
+        sh("umount", mnt)
+    assert digest == windows_disk["sha"]                                                 # Windows' data is intact
+
+    sh("mount", windows_disk["parts"][1], mnt)
+    try:
+        assert os.path.exists(f"{mnt}/EFI/Microsoft/Boot/bootmgfw.efi")                  # Windows' boot manager is still there
+        assert not os.path.exists(f"{mnt}/EFI/LintabOS")                                 # ours is gone
+    finally:
+        sh("umount", mnt)
+    assert firmware.order == ["0000"] and firmware.entries == {"0000": "Windows Boot Manager"}
+
+
+def test_remove_lintabos_leaves_the_space_alone_if_windows_is_flagged_for_a_check(windows_disk):
+    loop = windows_disk["loop"]
+    installed = _install_like_the_installer(windows_disk)    # the flag ntfsresize set is still on: Windows never ran
+    d = disks.read_disk(loop)
+    plan = uninstall.plan_uninstall(d)
+    assert plan.new_windows_size is None and "consistency check" in plan.grow_skipped
+    uninstall.apply_uninstall(plan, run=FakeFirmware())
+    after = {p.number: p for p in disks.read_disk(loop).partitions}
+    assert set(after) == {1, 2, 3, 4}
+    assert after[3].size == 6 * GiB - 2 * GiB                                            # Windows was not resized
+    assert after[4].start - after[3].end == 2 * GiB                                      # the space is simply free
+
+
+def test_remove_lintabos_refuses_a_disk_without_windows(windows_disk):
+    loop = windows_disk["loop"]
+    _install_like_the_installer(windows_disk)
+    d = disks.read_disk(loop)
+    win = disks.find_windows(d)
+    d.partitions = [p for p in d.partitions if p.number not in (2, 3)]
+    with pytest.raises(planmod.PlanError, match="No Windows installation"):
+        uninstall.plan_uninstall(d, check_esp=False)

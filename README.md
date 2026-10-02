@@ -28,6 +28,13 @@ It boots from a USB stick, installs with a touch-friendly installer, and can
 | Windows files in the sidebar | When installed next to Windows, the Windows drive shows as **Windows** in Files (read-only, mounted on first click, via `/etc/fstab` + `x-gvfs-show`). `lintab-windows-files enable\|disable [--read-write]` for existing installs; read-write is refused if Windows left the drive unclean. A BitLocker drive appears after **Unlock BitLocker Drive** |
 | Touch boot menu | **Touch Boot Menu** app / `lintab-boot-menu enable`: installs rEFInd next to GRUB with big LintabOS and Windows icons and touch enabled. Own boot entry, first in line; GRUB and Windows are not touched and `disable` undoes it. **Refuses while Secure Boot is on**; touch also depends on the tablet's firmware |
 | KDE Plasma and Xfce (optional) | Switch them on in the installer's account page; they are **downloaded during setup** (about 450 MB and 70 MB; the tablet must be online) from Debian after GRUB is installed, so a failed download can never cost you the boot. GDM stays the login screen and GNOME the default; pick the others from the gear icon. **Touch**: Plasma gets the Maliit on-screen keyboard and a 56 px panel (KWin already rotates from the accelerometer); Xfce gets a 48 px panel, bigger cursor and interface, the Onboard keyboard, and `lintab-xfce-rotate` (xrandr + touch-matrix rotation, since Xfce has none). `lintab-tablet-mode` switches each desktop's keyboard when the folio attaches or detaches |
+| Folio not working | **Tablet & Folio** app (or `lintab-tablet-mode assist`): the on-screen keyboard stays available even with the folio attached, and the folio keeps working. For the many folios that ship with a few dead keys. No mode ever turns the folio off |
+| Remove LintabOS | From the live USB: **Remove LintabOS** (welcome page, or `lintab-uninstall`). Deletes only the partition it can identify as LintabOS, grows Windows back into the space when that is safe (not BitLocker, not hibernated or flagged), cleans LintabOS's folder and boot entries from the EFI partition and puts Windows Boot Manager first. Refuses if no Windows is on the disk. Needs the phrase `REMOVE-LINTABOS` on the command line |
+| Update rollback | **LintabOS Updates** keeps a signature-checked copy of the version it replaces, runs a health check after installing, and goes back by itself if the new version is broken (`lintab-update rollback` does it on request) |
+| Hardware report | **Hardware Report** app (or `lintab-hwreport`): Wi-Fi, Bluetooth, fingerprint, sensors, cameras, folio, battery, storage, sleep. MAC/IP addresses, UUIDs, serial numbers, and your user and computer names are masked, Wi-Fi names are never collected, nothing is sent; you read it first and paste it into a GitHub issue |
+| LintabOS Extras | Optional downloads in one place: **Rnote and Xournal++** (drawing, notes), the **Office pack**, **Waydroid** (Android apps) and **Bottles** (Windows programs through Wine). Flathub apps install for you only, without a password; Waydroid asks for an administrator. Not in the ISO, which stays under GitHub's 2 GiB limit |
+| Reading mode and auto-brightness | **Reading Mode** (GNOME): warm screen all day until switched off, your own Night Light settings put back afterwards; `--grey` is an experimental greyscale. Auto-brightness from the light sensor and an evening warm-up are on by default |
+| Battery health | **Battery Health** app / `lintab-battery`: health as a percent of original capacity, cycles, and a charge limit (80 %) where the tablet's firmware exposes one; it says so when it doesn't |
 | Word, Excel, PowerPoint, OneDrive, Teams | Microsoft's own **web apps** in their own windows (Chromium app mode, one shared sign-in), plus *Connect OneDrive to Files* (GNOME Online Accounts). **There is no native Office or Teams for Linux.** The optional **Office Pack** downloads LibreOffice (edits .docx/.xlsx/.pptx offline) and the unofficial Teams for Linux from Flathub |
 
 ## Download
@@ -168,6 +175,16 @@ lintab-hwcheck
 It tests each layer (sensor hub → IIO → iio-sensor-proxy, USB fingerprint reader → fprintd,
 IPU6 → libcamera, LEDs, OSK) and says which one is missing.
 
+## Known issues reported from a real Duet 3
+
+These were reported by someone running LintabOS on a real IdeaPad Duet 3 and are **not fixed yet**; the cause of each is still unknown:
+
+- **Wi-Fi disappeared.**
+- **Fingerprint login doesn't work.**
+- **Pressing the power button or closing the folio leaves the tablet dead until it is force-restarted.** Real hibernation can't work (LintabOS uses zram only, no swap file), so this is most likely suspend that never resumes. Until it is fixed, `sudo systemctl mask sleep.target suspend.target hibernate.target hybrid-sleep.target` and setting the power button to "interactive" keep the tablet from sleeping at all.
+
+Please open the **Hardware Report** app on an affected tablet and paste the result into a [hardware-report issue](https://github.com/jgm240/LintabOS/issues/new?template=hardware-report.md); it collects exactly what is needed to find these.
+
 ## Honest status: what has and hasn't been tested
 
 Tested in this repository, automatically, in the builder container:
@@ -213,12 +230,19 @@ read from upstream sources and other people's probes, so treat them as expected-
 - **GRUB has no touch input**: the default boot menu needs the folio keyboard (or Bluetooth keyboard paired
   in firmware). The optional touch boot menu (rEFInd) only works with Secure Boot off, and whether the tablet's firmware
   passes touch to it is untested.
+- **0.3.0 features**: the safety rules and real behaviour of *Remove LintabOS* are tested on loop-device disks with real
+  `sfdisk`/`ntfsresize` at 512- and 4096-byte sectors (Windows' data checksum, partitions, boot files and firmware entries all checked;
+  space left alone when Windows is flagged, BitLocker-encrypted or no Windows is present); update rollback, the automatic rollback after a
+  failed health check and refusal of a tampered saved copy are tested with a fake GitHub and real signatures; the hardware report's masking,
+  its refusal to collect secrets, Extras' install logic, reading mode, and battery maths are unit-tested. **Not tested**: any of this on the
+  tablet, Waydroid (the kernel offers Android's binder as a module, which should work, but nobody has tried), Bottles, Rnote and Xournal++
+  with a pen, the light sensor, and whether the Duet's firmware offers a charge limit.
 - **KDE and Xfce**: the install order, GDM-stays-default guard, failure handling, DNS handling, touch settings, rotation maths and
   per-desktop keyboard commands are tested (`tests/test_desktops.py`); the Xfce xfconf keys and Onboard's gsettings keys were checked
   against the real packages in Debian 13, and both package lists resolve there. **Not tested**: an actual KDE or Xfce session on the
   tablet, Plasma's virtual-keyboard D-Bus switch, and whether Plasma's panel script takes effect on first login.
 - **0.2.0 features** (tablet mode, snap sound, school mode, Windows sidebar, touch boot menu, Microsoft 365 apps): the
-  decision logic and generated files are tested (`./scripts/test-features.sh`, 46 tests; school-mode udev rules checked with
+  decision logic and generated files are tested (`./scripts/test-features.sh`; school-mode udev rules checked with
   `udevadm verify`; the boot menu run against a fake firmware and ESP). Not tested on hardware: whether the folio's
   detach/attach is seen as a keyboard appearing and disappearing, whether a camera is really dead in school mode on the Duet,
   rEFInd's look and touch on the tablet, and the Microsoft web apps (they need a Microsoft account and depend on Microsoft's sites).

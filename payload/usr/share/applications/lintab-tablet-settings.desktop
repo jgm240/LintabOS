@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Tablet & Folio
+Comment=On-screen keyboard modes, including one for a folio with faulty keys
+Exec=lintab-tablet-settings
+Icon=input-keyboard-symbolic
+Categories=Settings;
+Keywords=keyboard;folio;tablet;osk;keys;broken;

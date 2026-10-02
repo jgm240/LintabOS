@@ -112,6 +112,16 @@ distribute, so they add no redistribution duty to the image. LintabOS only write
 size, keyboard). Their names are used descriptively. Onboard (GPL-3.0-or-later) and Maliit (LGPL-2.1) come with the same
 source-offer coverage as other Debian packages (see `NOTICE.md`).
 
+### Extras, hardware reports, removal (0.3.0)
+
+- **Extras** only download software on the user's request, from Flathub or Debian; nothing is redistributed in the ISO. Each keeps its own
+  licence (see `NOTICE.md`). The Windows/Android helpers (Wine through Bottles, Waydroid) are standard free software; running Windows
+  programs or Android apps is under those programs' own terms.
+- **Hardware report**: personal data is minimised by design: no Wi-Fi names or passwords, no serial numbers or machine id; MAC and IP
+  addresses, UUIDs and the user and computer name are masked before it is written, and it is shown to the user before anything leaves the
+  machine. It is never sent automatically, so the maintainer receives only what a user chooses to paste into a public issue.
+- **Remove LintabOS** deletes data only on the user's explicit confirmation and only a partition it can identify as LintabOS.
+
 ## 3. The Tux logo
 
 - **Copyright:** Tux was created by Larry Ewing in 1996 with The GIMP. Per Wikipedia and a second source, he released it with

@@ -32,6 +32,28 @@ else
     bad "iio-sensor-proxy reports no accelerometer"
 fi
 
+hdr "Wi-Fi and Bluetooth"
+wifi_dev=$(lspci -nn 2>/dev/null | grep -i -E 'network|wireless|802.11' | head -1)
+[ -z "$wifi_dev" ] && wifi_dev=$(lsusb 2>/dev/null | grep -i -E 'wireless|wlan|wi-?fi|802.11' | head -1)
+if [ -n "$wifi_dev" ]; then
+    ok "Wi-Fi hardware found: ${wifi_dev#* }"
+else
+    bad "no Wi-Fi hardware found on PCI or USB (firmware or driver may have failed to bind; see lspci -nnk)"
+fi
+if nmcli -t -f TYPE device 2>/dev/null | grep -q '^wifi'; then
+    ok "NetworkManager has a Wi-Fi device ($(nmcli -t -f DEVICE,TYPE,STATE device | grep ':wifi:' | head -1))"
+else
+    bad "NetworkManager has no Wi-Fi device. Check: rfkill list; journalctl -k -b | grep -i -E 'iwlwifi|firmware'"
+fi
+if rfkill list wifi 2>/dev/null | grep -q 'Soft blocked: yes\|Hard blocked: yes'; then
+    bad "Wi-Fi is blocked by rfkill: $(rfkill list wifi | grep -i blocked | tr '\n' ' ')"
+fi
+if journalctl -k -b 2>/dev/null | grep -qi -E 'iwlwifi.*(failed|error|no suitable firmware|firmware.*not found)'; then
+    warn "Wi-Fi driver messages: $(journalctl -k -b | grep -i -E 'iwlwifi.*(failed|error|firmware)' | tail -2 | tr '\n' ' ')"
+fi
+if bluetoothctl list 2>/dev/null | grep -q Controller; then ok "Bluetooth controller present"; else warn "no Bluetooth controller listed"; fi
+echo "       Share a full report: open 'Hardware Report' in the app grid (nothing is sent without your OK)"
+
 hdr "Fingerprint reader"
 if lsusb 2>/dev/null | grep -qi '27c6:'; then
     ok "Goodix reader on USB: $(lsusb | grep -i '27c6:' | head -1 | cut -d' ' -f6-)"

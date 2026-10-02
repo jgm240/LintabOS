@@ -43,6 +43,13 @@ Foundation.
 - The optional Xfce touch setup uses **Onboard** (GPL-3.0-or-later) as its on-screen keyboard and the optional KDE setup uses
   **Maliit** (LGPL-2.1); both are Debian packages downloaded on request, with their own license texts.
 
+- The optional **LintabOS Extras** download, on request and from their own sources: Rnote (GPL-3.0-or-later), Xournal++ (GPL-2.0-or-later),
+  LibreOffice (MPL-2.0), Teams for Linux (GPL-3.0, unofficial), Bottles (GPL-3.0-or-later, runs Wine, LGPL-2.1-or-later) from Flathub, and
+  **Waydroid** (GPL-3.0-or-later) from Debian backports. Waydroid downloads an Android system image from the Waydroid project; Google's
+  apps are not included or enabled. None of these are in the ISO.
+- Android is a trademark of Google LLC, Wine is a trademark of the Wine project, Rnote, Xournal++, Bottles and Waydroid belong to their
+  authors; they are named only to say what the Extras app can download.
+
 ## License of LintabOS's own code
 
 The original files of this project (installer, partitioner, BitLocker tools, scripts, configuration and artwork) are

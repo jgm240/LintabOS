@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Battery Health
+Comment=How worn the battery is, and a charge limit if the tablet supports one
+Exec=lintab-battery-gui
+Icon=battery-symbolic
+Categories=Settings;
+Keywords=battery;health;charge;limit;cycles;

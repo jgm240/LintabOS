@@ -1,0 +1,13 @@
+[Desktop Entry]
+Type=Application
+Name=Reading Mode
+Comment=Warm, easy-on-the-eyes screen until you switch it off again
+Exec=lintab-reading-mode toggle
+Icon=weather-clear-night-symbolic
+Categories=Utility;
+Keywords=reading;night;warm;eyes;blue light;grayscale;
+Actions=grey;
+
+[Desktop Action grey]
+Name=Reading mode, greyscale (experimental)
+Exec=lintab-reading-mode on --grey

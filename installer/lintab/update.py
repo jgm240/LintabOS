@@ -13,6 +13,10 @@ How it stays safe even if the GitHub account, the network or a mirror is hostile
 * **downgrades and re-installs are refused**, so an old signed release can't be replayed;
 * downloads are accepted only from GitHub's hosts (every redirect is checked), over HTTPS, with size limits;
 * checking is unprivileged and read-only; installing needs the user's password (polkit) and an explicit action.
+
+Rolling back: before installing, the updater keeps a signature-verified copy of the version being replaced
+(``/var/lib/lintabos/rollback``). After installing it runs a health check; if the new version is broken it goes back
+to the saved one by itself, and ``lintab-update rollback`` does the same on request.
 """
 
 from __future__ import annotations
@@ -37,6 +41,7 @@ API_ROOT = "https://api.github.com"
 KEY_PATH = "/usr/share/lintabos/update-key.pub"
 CONF_PATH = "/etc/lintabos/update.conf"
 CACHE_DIR = "/var/cache/lintabos-update"
+ROLLBACK_DIR = "/var/lib/lintabos/rollback"
 USER_AGENT = "lintabos-updater"
 
 MAX_JSON = 4 * 1024 * 1024
@@ -71,6 +76,10 @@ def _key_path() -> str:
 
 def _cache_dir() -> str:
     return os.environ.get("LINTAB_UPDATE_CACHE", CACHE_DIR) if _testing() else CACHE_DIR
+
+
+def _rollback_dir() -> str:
+    return os.environ.get("LINTAB_UPDATE_ROLLBACK", ROLLBACK_DIR) if _testing() else ROLLBACK_DIR
 
 
 def _conf_path() -> str:
@@ -243,8 +252,11 @@ def check(channel: Optional[str] = None) -> CheckResult:
 
 # --------------------------------------------------------------- verification ---
 
-def verify_package(deb: str, sig: str, release: Release) -> None:
-    """Raise UpdateError unless this file is the genuine, newer lintabos-core announced by the release."""
+def verify_package(deb: str, sig: str, release: Release, allow_older: bool = False) -> None:
+    """Raise UpdateError unless this file is the genuine lintabos-core announced by the release (and, normally, newer).
+
+    ``allow_older`` is only for rolling back to a copy we saved ourselves; the signature, name and version checks stay.
+    """
     key = _key_path()
     if not os.path.exists(key):
         raise UpdateError("The update signing key is missing from this system; refusing to install anything.")
@@ -265,20 +277,117 @@ def verify_package(deb: str, sig: str, release: Release) -> None:
     if fields["Version"] != release.version:
         raise UpdateError("The package version doesn't match the release it was published with; refusing it.")
     current = installed_version()
-    if current is not None and vercmp(fields["Version"], current) <= 0:
+    if not allow_older and current is not None and vercmp(fields["Version"], current) <= 0:
         raise UpdateError(f"Version {fields['Version']} is not newer than the installed {current}; "
                           "refusing to downgrade or reinstall.")
 
 
-def download_and_verify(release: Release, workdir: str) -> str:
+def download_and_verify(release: Release, workdir: str, allow_older: bool = False) -> str:
     deb = os.path.join(workdir, release.deb_name)
     sig = deb + ".minisig"
     with open(deb, "wb") as f:
         f.write(http_get(release.deb_url, MAX_DEB))
     with open(sig, "wb") as f:
         f.write(http_get(release.sig_url, MAX_SIG))
-    verify_package(deb, sig, release)
+    verify_package(deb, sig, release, allow_older)
     return deb
+
+
+# ------------------------------------------------------------------ rollback ---
+
+# What "the new version works" means. Each must exit 0; they run after the install, as root.
+HEALTH_COMMANDS: list[list[str]] = [
+    ["python3", "-m", "compileall", "-q", "/usr/lib/python3/dist-packages/lintab"],
+    ["python3", "-c", "import sys; sys.path.insert(0, '/usr/lib/python3/dist-packages'); "
+                      "import lintab.update, lintab.tablet, lintab.school, lintab.winfiles, lintab.bootmenu"],
+    ["/usr/bin/lintab-update", "status"],
+    ["/usr/bin/lintab-tablet-mode", "status"],
+    ["/usr/bin/lintab-school-mode", "status"],
+    ["/usr/bin/lintab-boot-menu", "status"],
+]
+
+
+def health_check(commands: Optional[list[list[str]]] = None) -> list[str]:
+    """Run the health commands; return one line per failure (empty list = healthy)."""
+    failures = []
+    status = subprocess.run(["dpkg-query", "-W", "-f=${Status}", PACKAGE], capture_output=True, text=True)
+    if "install ok installed" not in status.stdout:
+        failures.append(f"{PACKAGE} is not fully installed ({status.stdout.strip() or 'no status'})")
+    for command in (HEALTH_COMMANDS if commands is None else commands):
+        try:
+            proc = subprocess.run(command, capture_output=True, text=True, timeout=60)
+        except (OSError, subprocess.TimeoutExpired) as exc:
+            failures.append(f"{' '.join(command[:2])}: {exc}")
+            continue
+        if proc.returncode != 0:
+            last = (proc.stderr or proc.stdout).strip().splitlines()[-1:] or [f"exit {proc.returncode}"]
+            failures.append(f"{' '.join(command[:2])}: {last[0][:160]}")
+    return failures
+
+
+def rollback_info() -> Optional[dict]:
+    """The saved earlier version ({"version", "deb", "sig"}), if one is saved and its files are still there."""
+    directory = _rollback_dir()
+    try:
+        with open(os.path.join(directory, "info.json")) as f:
+            info = json.load(f)
+        version = parse_version(str(info["version"]))
+        deb, sig = os.path.join(directory, _deb_name(version)), os.path.join(directory, _deb_name(version) + ".minisig")
+    except (OSError, ValueError, KeyError, UpdateError):
+        return None
+    if not (os.path.isfile(deb) and os.path.isfile(sig)):
+        return None
+    return {"version": version, "deb": deb, "sig": sig}
+
+
+def save_rollback_copy(current: str, log=print) -> bool:
+    """Keep a verified copy of the installed version (re-downloaded from its own signed release). Best effort."""
+    try:
+        release = next((r for r in fetch_releases() if r.version == current), None)
+        if release is None:
+            log(f"No saved copy of {current} could be made (its release isn't on GitHub); rollback won't be available.")
+            return False
+        directory = _rollback_dir()
+        os.makedirs(os.path.dirname(directory), exist_ok=True)
+        staging = tempfile.mkdtemp(prefix=".rollback-", dir=os.path.dirname(directory))
+        try:
+            download_and_verify(release, staging, allow_older=True)
+            with open(os.path.join(staging, "info.json"), "w") as f:
+                json.dump({"version": current}, f)
+            shutil.rmtree(directory, ignore_errors=True)
+            os.rename(staging, directory)
+        finally:
+            shutil.rmtree(staging, ignore_errors=True)
+        return True
+    except (UpdateError, OSError) as exc:
+        log(f"Could not save a rollback copy of {current}: {exc}")
+        return False
+
+
+def _install_deb(deb: str, allow_downgrade: bool = False) -> None:
+    env = {**os.environ, "DEBIAN_FRONTEND": "noninteractive", "LC_ALL": "C.UTF-8"}
+    cmd = ["apt-get", "install", "-y", "--no-install-recommends"] + (["--allow-downgrades"] if allow_downgrade else []) + [deb]
+    proc = subprocess.run(cmd, env=env, capture_output=True, text=True)
+    if proc.returncode != 0:
+        tail = " ".join((proc.stderr or proc.stdout).strip().splitlines()[-3:])
+        raise UpdateError(f"Installing the package failed: {tail}")
+
+
+def rollback(log=print) -> str:
+    """Reinstall the saved earlier version. Returns the version now installed."""
+    if os.geteuid() != 0:
+        raise UpdateError("Rolling back needs administrator rights.")
+    info = rollback_info()
+    if info is None:
+        raise UpdateError("No earlier version is saved on this computer, so there is nothing to roll back to.")
+    stub = Release(tag=f"v{info['version']}", version=info["version"], name="", notes="", prerelease=False, url="",
+                   deb_url="", sig_url="", deb_name=_deb_name(info["version"]))
+    verify_package(info["deb"], info["sig"], stub, allow_older=True)      # re-check the signature: the file sat on disk
+    log(f"Going back to LintabOS {info['version']}…")
+    _install_deb(info["deb"], allow_downgrade=True)
+    shutil.rmtree(_rollback_dir(), ignore_errors=True)                    # that copy is the installed version now
+    log(f"LintabOS core is now version {installed_version()}.")
+    return info["version"]
 
 
 # ------------------------------------------------------------------- install ---
@@ -291,16 +400,41 @@ def apply(release: Release, log=print) -> None:
     try:
         log(f"Downloading LintabOS {release.version}…")
         deb = download_and_verify(release, workdir)
+        previous = installed_version()
+        saved = bool(previous) and save_rollback_copy(previous, log)
         log("Signature and package checked. Installing…")
-        env = {**os.environ, "DEBIAN_FRONTEND": "noninteractive", "LC_ALL": "C.UTF-8"}
-        proc = subprocess.run(["apt-get", "install", "-y", "--no-install-recommends", deb], env=env,
-                              capture_output=True, text=True)
-        if proc.returncode != 0:
-            tail = " ".join((proc.stderr or proc.stdout).strip().splitlines()[-3:])
-            raise UpdateError(f"Installing the update failed: {tail}")
+        _install_deb(deb)
+        failures = health_check()
+        if failures:
+            detail = "; ".join(failures[:3])
+            if saved and rollback_info():
+                rollback(log)
+                _remember_skipped(release.version)
+                raise UpdateError(f"LintabOS {release.version} failed its health check ({detail}), so LintabOS was "
+                                  f"rolled back to {previous}.")
+            raise UpdateError(f"LintabOS {release.version} installed but failed its health check ({detail}), and no "
+                              "earlier version was saved to go back to.")
         log(f"LintabOS core is now version {installed_version()}.")
     finally:
         shutil.rmtree(workdir, ignore_errors=True)
+
+
+def _remember_skipped(version: str) -> None:
+    """A version that was rolled back isn't announced again by the background check."""
+    try:
+        os.makedirs(_rollback_dir(), exist_ok=True)
+        with open(os.path.join(_rollback_dir(), "skipped"), "w") as f:
+            f.write(version)
+    except OSError:
+        pass
+
+
+def skipped_version() -> str:
+    try:
+        with open(os.path.join(_rollback_dir(), "skipped")) as f:
+            return f.read().strip()
+    except OSError:
+        return ""
 
 
 # --------------------------------------------------------------- notification ---
@@ -330,7 +464,8 @@ def _result_json(result: CheckResult, error: str = "") -> dict:
     latest = result.latest
     return {"installed": result.installed, "latest": latest.version if latest else None,
             "available": result.available, "prerelease": bool(latest and latest.prerelease),
-            "notes": latest.notes if latest else "", "page": latest.url if latest else "", "error": error}
+            "notes": latest.notes if latest else "", "page": latest.url if latest else "", "error": error,
+            "rollback": (rollback_info() or {}).get("version")}
 
 
 def main(argv: Optional[list[str]] = None) -> int:
@@ -344,13 +479,28 @@ def main(argv: Optional[list[str]] = None) -> int:
     a = sub.add_parser("apply", help="download, verify and install the newest release (needs root)")
     a.add_argument("--yes", action="store_true", help="don't ask for confirmation")
     a.add_argument("--channel", choices=["any", "stable"])
+    r = sub.add_parser("rollback", help="go back to the version that was installed before the last update (needs root)")
+    r.add_argument("--yes", action="store_true", help="don't ask for confirmation")
     sub.add_parser("status", help="show the installed version and settings")
     args = ap.parse_args(argv)
 
     if args.cmd == "status":
         conf = load_config()
         print(f"installed: {installed_version() or 'not installed'}\nchannel: {conf['channel']}\n"
-              f"auto_check: {conf['auto_check']}\nrepository: https://github.com/{REPO}")
+              f"auto_check: {conf['auto_check']}\nrepository: https://github.com/{REPO}\n"
+              f"rollback copy: {(rollback_info() or {}).get('version', 'none')}")
+        return 0
+
+    if args.cmd == "rollback":
+        try:
+            info = rollback_info()
+            if info and not args.yes:
+                if input(f"Go back to LintabOS {info['version']} (currently {installed_version()})? [y/N] ").strip().lower() != "y":
+                    return 1
+            rollback()
+        except UpdateError as exc:
+            print(f"error: {exc}", file=sys.stderr)
+            return 2
         return 0
 
     if args.cmd == "check":
@@ -371,7 +521,7 @@ def main(argv: Optional[list[str]] = None) -> int:
                 print(f"Update available: {result.installed or '(none)'} -> {result.latest.version}\n{result.latest.url}")
             else:
                 print(f"LintabOS core is up to date ({result.installed}).")
-        if args.notify and result.available and result.latest:
+        if args.notify and result.available and result.latest and result.latest.version != skipped_version():
             notify(result.latest)
         return 0
 

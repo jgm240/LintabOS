@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Remove LintabOS
+Comment=Delete LintabOS and give its space back to Windows
+Exec=lintab-uninstall-launch
+Icon=edit-delete-symbolic
+Categories=System;
+Terminal=false

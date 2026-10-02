@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=LintabOS Extras
+Comment=Optional downloads: drawing and notes, office, Android apps, Windows apps
+Exec=lintab-extras gui
+Icon=system-software-install
+Categories=System;
+Keywords=extras;rnote;xournal;libreoffice;waydroid;android;bottles;wine;

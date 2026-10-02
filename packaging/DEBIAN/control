@@ -8,7 +8,7 @@ Homepage: https://github.com/jgm240/LintabOS
 Depends: python3, python3-gi, gir1.2-gtk-4.0, gir1.2-adw-1, dislocker, ntfs-3g, fdisk, gdisk, dosfstools,
  e2fsprogs, rsync, polkitd, pkexec, minisign, dconf-cli, libnotify-bin, iio-sensor-proxy, fprintd, libpam-fprintd, fuse3,
  python3-pyudev, zenity, efibootmgr, apt
-Recommends: gnome-snapshot, libcamera-tools, grub-efi-amd64, chromium, flatpak, pipewire-bin | pulseaudio-utils
+Recommends: gnome-snapshot, libcamera-tools, grub-efi-amd64, chromium, flatpak, wl-clipboard, pipewire-bin | pulseaudio-utils
 Description: LintabOS tablet integration, installer, BitLocker tools and updater
  The LintabOS-specific parts of the system: tuning for the Lenovo IdeaPad Duet 3 (screen rotation, on-screen
  keyboard, fingerprint and camera setup), the installer and dual-boot partitioner, the "Boot into Windows" GRUB

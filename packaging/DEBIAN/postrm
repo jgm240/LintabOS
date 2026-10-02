@@ -6,6 +6,7 @@ remove|purge)
     if command -v systemctl >/dev/null 2>&1; then
         systemctl --global disable lintab-update-check.timer >/dev/null 2>&1 || true
         systemctl --global disable lintab-tablet-mode.service >/dev/null 2>&1 || true
+        systemctl disable lintab-battery-limit.service >/dev/null 2>&1 || true
     fi
     if command -v dconf >/dev/null 2>&1; then dconf update || true; fi
     ;;

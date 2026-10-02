@@ -9,6 +9,7 @@ system and set up GRUB); this file is only the wizard around them.
 from __future__ import annotations
 
 import os
+import subprocess
 import sys
 import threading
 from dataclasses import dataclass, field
@@ -168,8 +169,13 @@ class InstallerWindow(Adw.ApplicationWindow):
                 break
         else:
             status.set_icon_name("computer-symbolic")
-        return self._page("Welcome", "welcome", status,
-                          self._footer("Install LintabOS", self._go_disks), can_pop=False)
+        footer = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+        footer.append(self._footer("Install LintabOS", self._go_disks))
+        remove = Gtk.Button(label="Remove LintabOS from this computer…", halign=Gtk.Align.CENTER, margin_bottom=12)
+        remove.add_css_class("flat")
+        remove.connect("clicked", lambda _b: subprocess.Popen(["lintab-uninstall-gui"]))
+        footer.append(remove)
+        return self._page("Welcome", "welcome", status, footer, can_pop=False)
 
     # ------------------------------------------------------------------ disks
     def _go_disks(self) -> None:

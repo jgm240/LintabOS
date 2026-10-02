@@ -345,3 +345,26 @@ def test_the_generated_snaps_are_valid_short_audible_and_different(tmp_path):
     import struct
     peak = max(abs(v) for v in struct.unpack("<%dh" % (len(data["attached"]) // 2), data["attached"]))
     assert 20000 < peak < 32767                                                      # loud enough, not clipped
+
+
+# ------------------------------------------------- "Folio not working" (assist) mode --
+
+def test_assist_mode_keeps_the_on_screen_keyboard_on_with_the_folio_attached():
+    assert tablet.decide("assist", [TOUCHSCREEN, FOLIO]) == "tablet"            # folio attached, OSK still on
+    assert tablet.decide("assist", []) == "tablet"
+    assert "assist" in tablet.MODES
+    # nothing in tablet state disables the folio: only the OSK setting changes
+    for desktop in ("gnome", "kde", "xfce"):
+        for command in tablet.osk_commands("tablet", desktop):
+            assert not any(word in " ".join(command).lower() for word in ("disable", "inhibit", "unbind", "xinput"))
+
+
+def test_assist_mode_is_remembered_and_still_announces_the_folio(tmp_path):
+    conf = str(tmp_path / "tablet-mode.conf")
+    tablet.write_mode("assist", conf)
+    assert tablet.read_mode(conf) == "assist"
+    title, body = tablet.event_text(True, "tablet", "assist")
+    assert title == "Keyboard Attached" and "folio keys work" in body and "stays on" in body
+    assert tablet.event_text(False, "tablet", "assist")[0] == "Keyboard Detached"
+    state, attached, event, apply = tablet.plan_refresh("assist", [TOUCHSCREEN, FOLIO], False, "tablet")
+    assert (state, attached, event, apply) == ("tablet", True, True, False)       # snap + message, OSK unchanged

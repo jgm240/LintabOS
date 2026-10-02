@@ -29,3 +29,12 @@ payload/usr/share/lintabos/refind/
 payload/usr/share/lintabos/sounds/
 payload/usr/bin/lintab-touch-setup
 payload/usr/bin/lintab-xfce-rotate
+payload/usr/bin/lintab-tablet-settings
+payload/usr/bin/lintab-uninstall
+payload/usr/bin/lintab-hwreport
+payload/usr/bin/lintab-extras
+payload/usr/bin/lintab-reading-mode
+payload/usr/bin/lintab-battery
+payload/usr/bin/lintab-battery-gui
+payload/usr/bin/lintab-uninstall-gui
+payload/usr/bin/lintab-uninstall-launch

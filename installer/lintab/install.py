@@ -233,7 +233,8 @@ def _remove_live_bits(cfg: InstallConfig) -> None:
     _chroot(["sh", "-c", "apt-get -y purge " + " ".join(LIVE_ONLY_PACKAGES) + " || true"])
     _chroot(["sh", "-c", "apt-get -y autoremove --purge || true"])
     for path in ("/etc/sudoers.d/live", "/etc/live", "/etc/systemd/system/getty@tty1.service.d/live-config.conf",
-                 "/etc/xdg/autostart/lintab-live-installer.desktop", "/usr/share/applications/lintab-installer.desktop"):
+                 "/etc/xdg/autostart/lintab-live-installer.desktop", "/usr/share/applications/lintab-installer.desktop",
+                 "/usr/share/applications/lintab-uninstall.desktop"):
         full = TARGET + path
         if os.path.isdir(full):
             shutil.rmtree(full, ignore_errors=True)

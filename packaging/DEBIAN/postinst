@@ -21,6 +21,7 @@ configure)
     if command -v systemctl >/dev/null 2>&1; then
         systemctl --global enable lintab-update-check.timer >/dev/null 2>&1 || true
         systemctl --global enable lintab-tablet-mode.service >/dev/null 2>&1 || true
+        systemctl enable lintab-battery-limit.service >/dev/null 2>&1 || true
     fi
 
     # An upgrade (not the first install): refresh what depends on the files we ship.

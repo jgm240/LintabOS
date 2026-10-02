@@ -1,0 +1,10 @@
+[Unit]
+Description=LintabOS battery charge limit (if one is set)
+After=multi-user.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/libexec/lintab/battery-limit apply
+
+[Install]
+WantedBy=multi-user.target

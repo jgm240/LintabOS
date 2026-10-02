@@ -113,6 +113,8 @@ def env(tmp_path, monkeypatch, keys):
     conf = tmp_path / "update.conf"
     conf.write_text("channel = any\nauto_check = true\n")
     monkeypatch.setenv("LINTAB_UPDATE_CONF", str(conf))
+    monkeypatch.setenv("LINTAB_UPDATE_ROLLBACK", str(tmp_path / "rollback"))
+    monkeypatch.setattr(update, "HEALTH_COMMANDS", [])           # the fake test packages ship no LintabOS tools to check
     web = FakeGitHub(str(tmp_path))
     monkeypatch.setenv("LINTAB_UPDATE_API", web.url)
     subprocess.run(["dpkg", "--purge", "lintabos-core"], capture_output=True)
@@ -301,3 +303,82 @@ def test_auto_check_can_be_turned_off(env, keys, tmp_path, monkeypatch):
     monkeypatch.setattr(update, "check", lambda *a, **k: called.append(1))
     assert update.main(["check", "--quiet", "--notify"]) == 0
     assert not called, "the background check must not contact GitHub when auto_check is false"
+
+
+# ------------------------------------------------------------------- rollback --
+
+@needs_env
+def test_an_update_keeps_a_verified_copy_of_the_old_version_and_rollback_restores_it(env, keys, tmp_path):
+    os.makedirs(tmp_path / "base")
+    sh("dpkg", "-i", make_deb(str(tmp_path / "base"), "0.1.0"))
+    env.publish("0.1.0", keys["good"][1])
+    env.publish("0.1.1", keys["good"][1])
+    assert update.rollback_info() is None
+
+    update.apply(update.check().latest, log=lambda *_: None)
+    assert update.installed_version() == "0.1.1"
+    info = update.rollback_info()
+    assert info and info["version"] == "0.1.0"
+
+    assert update.rollback(log=lambda *_: None) == "0.1.0"
+    assert update.installed_version() == "0.1.0"
+    assert open("/usr/share/lintabos-test/marker").read() == "0.1.0"
+    assert update.rollback_info() is None                              # the saved copy is the installed one now
+    with pytest.raises(update.UpdateError, match="nothing to roll back"):
+        update.rollback(log=lambda *_: None)
+
+
+@needs_env
+def test_a_broken_update_is_rolled_back_by_itself_and_not_announced_again(env, keys, tmp_path, monkeypatch):
+    os.makedirs(tmp_path / "base")
+    sh("dpkg", "-i", make_deb(str(tmp_path / "base"), "0.1.0"))
+    env.publish("0.1.0", keys["good"][1])
+    env.publish("0.1.1", keys["good"][1])
+    monkeypatch.setattr(update, "HEALTH_COMMANDS", [["sh", "-c", "grep -q 0.1.1 /usr/share/lintabos-test/marker && "
+                                                    "echo 'tablet tools crashed' >&2 && exit 1 || exit 0"]])
+    with pytest.raises(update.UpdateError, match="rolled back to 0.1.0") as err:
+        update.apply(update.check().latest, log=lambda *_: None)
+    assert "tablet tools crashed" in str(err.value)
+    assert update.installed_version() == "0.1.0"
+    assert update.skipped_version() == "0.1.1"                         # the background check won't nag about it
+
+
+@needs_env
+def test_a_failed_health_check_without_a_saved_copy_says_so(env, keys, tmp_path, monkeypatch):
+    os.makedirs(tmp_path / "base")
+    sh("dpkg", "-i", make_deb(str(tmp_path / "base"), "0.0.9"))         # no release on GitHub for the installed version
+    env.publish("0.1.1", keys["good"][1])
+    monkeypatch.setattr(update, "HEALTH_COMMANDS", [["false"]])
+    with pytest.raises(update.UpdateError, match="no earlier version was saved"):
+        update.apply(update.check().latest, log=lambda *_: None)
+    assert update.installed_version() == "0.1.1"
+
+
+@needs_env
+def test_rollback_refuses_a_tampered_saved_copy(env, keys, tmp_path):
+    os.makedirs(tmp_path / "base")
+    sh("dpkg", "-i", make_deb(str(tmp_path / "base"), "0.1.0"))
+    env.publish("0.1.0", keys["good"][1])
+    env.publish("0.1.1", keys["good"][1])
+    update.apply(update.check().latest, log=lambda *_: None)
+    with open(update.rollback_info()["deb"], "ab") as f:                # someone edits the file on disk
+        f.write(b"tamper")
+    with pytest.raises(update.UpdateError, match="signature is NOT valid"):
+        update.rollback(log=lambda *_: None)
+    assert update.installed_version() == "0.1.1"
+
+
+def test_health_check_reports_each_failing_command_and_a_broken_package_state(monkeypatch):
+    class Done:
+        def __init__(self, rc, out="", err=""):
+            self.returncode, self.stdout, self.stderr = rc, out, err
+
+    def fake_run(argv, **kw):
+        if argv[0] == "dpkg-query":
+            return Done(0, "install ok installed")
+        return Done(1, "", "boom: it crashed\nmore") if argv[0] == "bad" else Done(0)
+    monkeypatch.setattr(update.subprocess, "run", fake_run)
+    assert update.health_check([["good"], ["bad", "x"]]) == ["bad x: more"]
+    monkeypatch.setattr(update.subprocess, "run",
+                        lambda argv, **kw: Done(0, "deinstall ok half-configured") if argv[0] == "dpkg-query" else Done(0))
+    assert "not fully installed" in update.health_check([])[0]

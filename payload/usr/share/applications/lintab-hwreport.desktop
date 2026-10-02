@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Hardware Report
+Comment=Check Wi-Fi, fingerprint, sensors and cameras and share a report to get problems fixed
+Exec=lintab-hwreport --assist
+Icon=utilities-system-monitor
+Categories=System;
+Keywords=hardware;wifi;fingerprint;report;bug;debug;
