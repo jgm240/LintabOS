@@ -3,6 +3,12 @@
 # it is named here.
 lintabos-core
 
+# ---- Microsoft 365 web apps (own windows via Chromium app mode), tablet-mode sound ----
+chromium
+pipewire-bin
+python3-pyudev
+zenity
+
 # ---- Desktop ---------------------------------------------------------------
 gnome-core
 gdm3

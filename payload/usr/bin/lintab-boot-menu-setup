@@ -1,0 +1,17 @@
+#!/bin/sh
+# SPDX-License-Identifier: MIT
+# Turn the touch-friendly boot menu on or off (wraps `lintab-boot-menu`, which needs an administrator).
+set -u
+status=$(lintab-boot-menu status 2>&1)
+if [ -e /var/lib/lintabos/boot-menu.json ]; then
+    zenity --question --title="Touch boot menu" --width=420 --text="The touch boot menu is ON.\n\nTurn it off and go back to the plain GRUB menu?" || exit 0
+    action=disable
+else
+    zenity --question --title="Touch boot menu" --width=440 --text="$status\n\nTurn on a big, tappable menu that offers LintabOS and Windows at power-on?\n\nGRUB and Windows stay untouched, and this can be undone here. It does not work while Secure Boot is on; touch also depends on your tablet's firmware (the arrow keys always work)." || exit 0
+    action=enable
+fi
+if out=$(pkexec /usr/bin/lintab-boot-menu "$action" 2>&1); then
+    zenity --info --title="Touch boot menu" --width=420 --text="Done:\n$out"
+else
+    zenity --error --title="Touch boot menu" --width=440 --text="$out"
+fi

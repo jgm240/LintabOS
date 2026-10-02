@@ -72,4 +72,12 @@ rsvg-convert -w 256 -h 256 "$LOGO" -o "$PLY/logo.png"
 
 # --- licence texts that must travel with what we derived from them -----------------------------------
 cp LICENSES/Bitstream-Vera-DejaVu.txt "$T/FONT-LICENSE.txt"   # the GRUB .pf2 fonts are converted from DejaVu
+# --- touch boot menu (rEFInd) icon + background; the Windows icon comes from the refind package -------------
+RF="$CHROOT/usr/share/lintabos/refind"
+mkdir -p "$RF"
+rsvg-convert -w 256 -h 256 "$LOGO" -o "$RF/lintabos.png"
+cp "$T/background.png" "$RF/background.png"
+
+# --- the snap played when the folio keyboard is attached or detached (synthesised, see the script) ---------
+python3 scripts/gen_keyboard_sounds.py "$CHROOT/usr/share/lintabos/sounds"
 echo "assets generated"

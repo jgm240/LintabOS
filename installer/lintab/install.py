@@ -112,6 +112,7 @@ def install(cfg: InstallConfig, progress: Progress) -> None:
         _write_fstab(root_dev, esp_dev)
         _configure_identity(cfg)
         _create_user(cfg)
+        _show_windows_files(cfg)
         _remove_live_bits(cfg)
 
         progress(0.88, "Building the boot image")
@@ -191,6 +192,21 @@ def _create_user(cfg: InstallConfig) -> None:
              "--groups", groups, cfg.username])
     _chroot(["chpasswd"], input=f"{cfg.username}:{cfg.password}\n")
     _chroot(["passwd", "--lock", "root"])
+
+
+def _show_windows_files(cfg: InstallConfig) -> None:
+    """Dual-boot only: list the Windows drive (read-only) in the Files sidebar. Never fatal to the install."""
+    if not cfg.plan.windows_present:
+        return
+    try:
+        from . import winfiles
+        for line in open(f"{TARGET}/etc/passwd"):
+            fields = line.split(":")
+            if fields[0] == cfg.username:
+                winfiles.add_to_fstab(f"{TARGET}/etc/fstab", int(fields[2]), int(fields[3]), root=TARGET)
+                break
+    except Exception:
+        pass  # an unreadable Windows partition (BitLocker, say) just means no sidebar entry
 
 
 def _remove_live_bits(cfg: InstallConfig) -> None:

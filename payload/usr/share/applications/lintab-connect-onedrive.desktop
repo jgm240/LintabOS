@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Connect OneDrive to Files
+Comment=Add your Microsoft account so OneDrive can appear in the Files sidebar
+Exec=gnome-control-center online-accounts
+Icon=folder-remote
+Categories=Settings;
+Keywords=onedrive;microsoft;account;cloud;

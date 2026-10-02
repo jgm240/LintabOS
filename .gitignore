@@ -21,3 +21,9 @@ live/config/packages.chroot/
 out-build.console
 .lintabos-signing/
 *.minisec
+payload/usr/bin/lintab-tablet-mode
+payload/usr/bin/lintab-school-mode*
+payload/usr/bin/lintab-windows-files
+payload/usr/bin/lintab-boot-menu
+payload/usr/share/lintabos/refind/
+payload/usr/share/lintabos/sounds/

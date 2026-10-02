@@ -11,6 +11,14 @@ Foundation.
 - Linux is the registered trademark of Linus Torvalds in the U.S. and other countries.
 - Windows and BitLocker are trademarks of Microsoft Corporation. They are named here only to describe what
   LintabOS can read, install beside, and boot.
+- Microsoft, Word, Excel, PowerPoint, OneDrive, Teams, Microsoft 365 and Office are trademarks of the Microsoft group of
+  companies. LintabOS only offers shortcuts that open Microsoft's own web sites in a window; it ships no Microsoft software,
+  logos or icons (generic desktop icons are used), and is not affiliated with or endorsed by Microsoft.
+- LibreOffice is a trademark of The Document Foundation; Teams for Linux is an unofficial community project (MIT), neither
+  is shipped in the image: the optional Office Pack downloads them from Flathub.
+- Chromium is a project of Google and contributors; the browser is Debian's unmodified Chromium package, used only to
+  show the web apps. Nintendo, Joy-Con and Switch are trademarks of Nintendo; they are not used in LintabOS, whose
+  keyboard snap sound is synthesised from scratch.
 - Lenovo and IdeaPad are trademarks of Lenovo. They are named only to say which hardware LintabOS is built for.
 - Firefox is a trademark of the Mozilla Foundation. The browser is Debian's unmodified Firefox ESR package.
 - GNOME is a trademark of the GNOME Foundation. Intel is a trademark of Intel Corporation.
@@ -26,6 +34,9 @@ Foundation.
 - BitLocker support uses **dislocker** (GPL-2.0-or-later, with BSD-3-Clause parts) and, optionally, **libbde**
   (LGPL-3.0-or-later). The recovery-key rules and the volume layout were checked against dislocker's source and
   the libbde format documentation; no code was copied from either.
+
+- The optional touch boot menu uses **rEFInd** by Roderick W. Smith (GPL-3.0-or-later, with BSD/FreeBSD-licensed parts;
+  installed from Debian's `refind` package on request). Its Windows icon comes from that package.
 
 ## License of LintabOS's own code
 

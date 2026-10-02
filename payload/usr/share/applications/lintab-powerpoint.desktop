@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=PowerPoint (web)
+Comment=Microsoft PowerPoint in its own window (needs a Microsoft account)
+Exec=lintab-webapp powerpoint https://www.office.com/launch/powerpoint
+Icon=x-office-presentation
+Categories=Office;
+StartupWMClass=lintab-powerpoint
+Keywords=powerpoint;pptx;microsoft;office;

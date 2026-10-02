@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Teams (web)
+Comment=Microsoft Teams in its own window (needs a Microsoft or school account)
+Exec=lintab-webapp teams https://teams.microsoft.com/
+Icon=internet-chat
+Categories=Office;
+StartupWMClass=lintab-teams
+Keywords=teams;microsoft;chat;meeting;

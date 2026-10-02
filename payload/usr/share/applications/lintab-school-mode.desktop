@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=School Mode
+Comment=Switch every camera off (an administrator's password turns it back on)
+Exec=lintab-school-mode-gui
+Icon=camera-disabled-symbolic
+Categories=Settings;
+Keywords=school;camera;privacy;exam;

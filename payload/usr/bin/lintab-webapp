@@ -1,0 +1,18 @@
+#!/bin/sh
+# SPDX-License-Identifier: MIT
+# Open a web app in its own window, without browser tabs or address bar (Chromium "app mode").
+#   lintab-webapp NAME URL
+# All LintabOS web apps share one profile, so you sign in to Microsoft once. Falls back to the normal browser.
+set -eu
+name=${1:?usage: lintab-webapp NAME URL}
+url=${2:?usage: lintab-webapp NAME URL}
+case "$url" in https://*) ;; *) echo "only https:// addresses are allowed" >&2; exit 2 ;; esac
+for browser in chromium chromium-browser google-chrome-stable; do
+    if command -v "$browser" >/dev/null 2>&1; then
+        exec "$browser" --app="$url" --class="lintab-$name" --user-data-dir="${XDG_CONFIG_HOME:-$HOME/.config}/lintabos/webapps" \
+            --no-first-run --no-default-browser-check --ozone-platform-hint=auto
+    fi
+done
+command -v notify-send >/dev/null 2>&1 && notify-send -a LintabOS "Chromium isn't installed" \
+    "Opening $name in your normal browser. For its own window: sudo apt install chromium"
+exec xdg-open "$url"

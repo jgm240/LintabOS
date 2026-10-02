@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Excel (web)
+Comment=Microsoft Excel in its own window (needs a Microsoft account)
+Exec=lintab-webapp excel https://www.office.com/launch/excel
+Icon=x-office-spreadsheet
+Categories=Office;
+StartupWMClass=lintab-excel
+Keywords=excel;xlsx;microsoft;office;

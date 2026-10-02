@@ -23,6 +23,11 @@ It boots from a USB stick, installs with a touch-friendly installer, and can
 | BitLocker | dislocker installed and set up (FUSE, polkit, menu entry): **Unlock BitLocker Drive** app to open an encrypted Windows drive with its recovery key, and an installer step that can turn BitLocker off so Windows can be shrunk |
 | Updates | **LintabOS Updates** (`lintab-update`) installs signed releases of LintabOS's own parts from this repository's GitHub releases; Debian's packages update through Software. See [docs/UPDATES.md](docs/UPDATES.md) |
 | Memory | zram swap (no swapping to the UFS) |
+| Automatic tablet mode | `lintab-tablet-mode` watches udev: folio keyboard (or any USB/Bluetooth keyboard) attached → on-screen keyboard off, detached → on. A **"Keyboard Attached" / "Keyboard Detached"** notification and a short snap sound (synthesised in `scripts/gen_keyboard_sounds.py`) play each time. `lintab-tablet-mode auto\|tablet\|laptop` overrides it |
+| School mode | **School Mode** app / `lintab-school-mode on`: blocks the camera drivers, makes every `/dev/video*` and `/dev/media*` node unopenable, and de-authorizes USB webcams. Turning it on needs no password; **turning it off needs an administrator's password** (polkit). `lintab-school-mode verify` checks that no camera is reachable |
+| Windows files in the sidebar | When installed next to Windows, the Windows drive shows as **Windows** in Files (read-only, mounted on first click, via `/etc/fstab` + `x-gvfs-show`). `lintab-windows-files enable\|disable [--read-write]` for existing installs; read-write is refused if Windows left the drive unclean. A BitLocker drive appears after **Unlock BitLocker Drive** |
+| Touch boot menu | **Touch Boot Menu** app / `lintab-boot-menu enable`: installs rEFInd next to GRUB with big LintabOS and Windows icons and touch enabled. Own boot entry, first in line; GRUB and Windows are not touched and `disable` undoes it. **Refuses while Secure Boot is on**; touch also depends on the tablet's firmware |
+| Word, Excel, PowerPoint, OneDrive, Teams | Microsoft's own **web apps** in their own windows (Chromium app mode, one shared sign-in), plus *Connect OneDrive to Files* (GNOME Online Accounts). **There is no native Office or Teams for Linux.** The optional **Office Pack** downloads LibreOffice (edits .docx/.xlsx/.pptx offline) and the unofficial Teams for Linux from Flathub |
 
 ## Download
 
@@ -204,8 +209,14 @@ read from upstream sources and other people's probes, so treat them as expected-
 - **LED**: the 11IAN8 datasheet lists no user LED. I assumed "the LED" means the camera privacy LED
   (handled by the kernel camera driver) and any LEDs under `/sys/class/leds` (`lintab-led list`).
   If you meant something else, say so.
-- **GRUB has no touch input**: the boot menu needs the folio keyboard (or Bluetooth keyboard paired
-  in firmware).
+- **GRUB has no touch input**: the default boot menu needs the folio keyboard (or Bluetooth keyboard paired
+  in firmware). The optional touch boot menu (rEFInd) only works with Secure Boot off, and whether the tablet's firmware
+  passes touch to it is untested.
+- **0.2.0 features** (tablet mode, snap sound, school mode, Windows sidebar, touch boot menu, Microsoft 365 apps): the
+  decision logic and generated files are tested (`./scripts/test-features.sh`, 24 tests; school-mode udev rules checked with
+  `udevadm verify`; the boot menu run against a fake firmware and ESP). Not tested on hardware: whether the folio's
+  detach/attach is seen as a keyboard appearing and disappearing, whether a camera is really dead in school mode on the Duet,
+  rEFInd's look and touch on the tablet, and the Microsoft web apps (they need a Microsoft account and depend on Microsoft's sites).
 - **BitLocker on real Windows**: the volumes above follow the published format and real dislocker accepts them, but they
   are not Windows-made. Windows' own BitLocker variants (4K-sector drives, "used space only" encryption, Elephant
   diffuser on older volumes) are handled by dislocker for reading; the in-place decryption has only run on the

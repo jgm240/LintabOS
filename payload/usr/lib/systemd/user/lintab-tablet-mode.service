@@ -1,0 +1,12 @@
+[Unit]
+Description=LintabOS automatic tablet mode (on-screen keyboard follows the folio keyboard)
+PartOf=graphical-session.target
+After=graphical-session.target
+
+[Service]
+ExecStart=/usr/bin/lintab-tablet-mode run
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=graphical-session.target

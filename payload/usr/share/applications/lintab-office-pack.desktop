@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Office Pack (LibreOffice, Teams for Linux)
+Comment=Optional download: offline Office-compatible apps
+Exec=lintab-office-pack
+Icon=system-software-install
+Categories=Office;
+Keywords=office;libreoffice;teams;word;excel;

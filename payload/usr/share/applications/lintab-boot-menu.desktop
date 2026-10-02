@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Touch Boot Menu
+Comment=Turn the tappable LintabOS/Windows boot menu on or off
+Exec=lintab-boot-menu-setup
+Icon=preferences-system
+Categories=Settings;
+Keywords=boot;grub;refind;windows;touch;

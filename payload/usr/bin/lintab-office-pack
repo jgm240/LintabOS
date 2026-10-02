@@ -1,0 +1,17 @@
+#!/bin/sh
+# SPDX-License-Identifier: MIT
+# Optional downloads: LibreOffice (opens and edits .docx/.xlsx/.pptx offline) and Teams for Linux (an unofficial
+# desktop wrapper around Teams on the web). Installed from Flathub for this user only; needs internet.
+set -eu
+if ! zenity --question --title="Office pack" --width=420 --text="Download from Flathub (about 700 MB)?\n\n• LibreOffice: Word, Excel and PowerPoint files, offline\n• Teams for Linux: an unofficial Teams app (not made by Microsoft)\n\nMicrosoft does not offer Word, Excel, PowerPoint or Teams for Linux; this is the closest you can get."; then
+    exit 0
+fi
+(
+    flatpak remote-add --user --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
+    flatpak install --user -y --noninteractive flathub org.libreoffice.LibreOffice com.github.IsmaelMartinez.teams_for_linux
+) 2>&1 | zenity --progress --pulsate --auto-close --no-cancel --title="Office pack" --text="Downloading…" || true
+if flatpak info --user org.libreoffice.LibreOffice >/dev/null 2>&1; then
+    zenity --info --title="Office pack" --text="Done. LibreOffice and Teams for Linux are in your app grid."
+else
+    zenity --error --title="Office pack" --text="The download did not finish. Check your internet connection and try again."
+fi

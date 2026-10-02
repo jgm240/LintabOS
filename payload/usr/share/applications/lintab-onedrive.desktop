@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=OneDrive (web)
+Comment=Your OneDrive files in their own window
+Exec=lintab-webapp onedrive https://www.office.com/launch/onedrive
+Icon=folder-remote
+Categories=Office;
+StartupWMClass=lintab-onedrive
+Keywords=onedrive;microsoft;cloud;

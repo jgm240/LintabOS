@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE policyconfig PUBLIC "-//freedesktop//DTD PolicyKit Policy Configuration 1.0//EN"
+ "http://www.freedesktop.org/standards/PolicyKit/1/policyconfig.dtd">
+<policyconfig>
+  <!-- Turning school mode ON needs no password. -->
+  <action id="org.lintabos.school-mode-on">
+    <description>Turn school mode on (cameras off)</description>
+    <message>Authentication is required to turn school mode on</message>
+    <defaults>
+      <allow_any>no</allow_any>
+      <allow_inactive>no</allow_inactive>
+      <allow_active>yes</allow_active>
+    </defaults>
+    <annotate key="org.freedesktop.policykit.exec.path">/usr/libexec/lintab/school-mode-on</annotate>
+  </action>
+  <!-- Turning it OFF needs an administrator's password every time (never cached). -->
+  <action id="org.lintabos.school-mode-off">
+    <description>Turn school mode off (cameras back on)</description>
+    <message>An administrator's password is required to turn school mode off</message>
+    <defaults>
+      <allow_any>no</allow_any>
+      <allow_inactive>no</allow_inactive>
+      <allow_active>auth_admin</allow_active>
+    </defaults>
+    <annotate key="org.freedesktop.policykit.exec.path">/usr/libexec/lintab/school-mode-off</annotate>
+  </action>
+</policyconfig>

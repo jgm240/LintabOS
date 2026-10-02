@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Word (web)
+Comment=Microsoft Word in its own window (needs a Microsoft account)
+Exec=lintab-webapp word https://www.office.com/launch/word
+Icon=x-office-document
+Categories=Office;
+StartupWMClass=lintab-word
+Keywords=word;docx;microsoft;office;
