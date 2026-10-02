@@ -1,0 +1,78 @@
+# SPDX-License-Identifier: MIT
+# Builds the LintabOS ISO on GitHub's servers and attaches it to an existing release.
+# Run it by hand:  Actions > "Build ISO" > Run workflow (or: gh workflow run build-iso.yml -f tag=v0.1.0)
+#
+# It checks out the commit the release tag points at, so the ISO is built from the same source as the signed
+# lintabos-core package on that release. It needs no secrets: the package signature is made on the
+# maintainer's own computer (scripts/release.sh), never in CI.
+name: Build ISO
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag to build and attach the ISO to (it must already exist)"
+        required: true
+        default: "v0.1.0"
+
+permissions:
+  contents: write   # to attach the ISO to the release
+
+concurrency:
+  group: build-iso
+  cancel-in-progress: false
+
+jobs:
+  iso:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 150
+    steps:
+      - name: Check the release exists
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release view "${{ inputs.tag }}" --repo "${{ github.repository }}" >/dev/null
+
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag }}
+
+      - name: Make room (the build needs about 15 GB)
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL /usr/local/share/boost
+          df -h /
+
+      - name: Build the ISO (same script as on a laptop)
+        run: ./build.sh
+
+      - name: Check what was built
+        run: |
+          set -euo pipefail
+          VERSION=$(cat VERSION)
+          ls -l out/lintabos-amd64.iso
+          (cd out && sha256sum -c lintabos-amd64.iso.sha256)
+          size=$(stat -c %s out/lintabos-amd64.iso)
+          # GitHub release assets are limited to 2 GiB
+          [ "$size" -lt 2147483648 ] || { echo "ISO is $size bytes: too big for a release asset"; exit 1; }
+          sudo apt-get update -qq && sudo apt-get install -y -qq xorriso >/dev/null
+          xorriso -osirrox on -indev out/lintabos-amd64.iso -extract /live/filesystem.packages /tmp/pk.txt >/dev/null 2>&1
+          grep -P "^lintabos-core\t$VERSION$" /tmp/pk.txt
+          grep -P "^dislocker\t" /tmp/pk.txt
+          xorriso -indev out/lintabos-amd64.iso -find /boot/grub/efi.img /live/vmlinuz-7.1.13+deb13-amd64 2>/dev/null | grep -c efi.img
+
+      - name: Attach the ISO and refresh SHA256SUMS
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          TAG="${{ inputs.tag }}"
+          VERSION=$(cat VERSION)
+          ISO="lintabos-$VERSION-amd64.iso"
+          mkdir -p dist && cp out/lintabos-amd64.iso "dist/$ISO"
+          gh release upload "$TAG" "dist/$ISO" --clobber
+          # SHA256SUMS keeps the package line and gets this ISO's checksum
+          gh release download "$TAG" --pattern SHA256SUMS --dir dist --clobber || : > dist/SHA256SUMS
+          grep -v " $ISO\$" dist/SHA256SUMS > dist/SHA256SUMS.new || true
+          (cd dist && sha256sum "$ISO") >> dist/SHA256SUMS.new
+          mv dist/SHA256SUMS.new dist/SHA256SUMS
+          gh release upload "$TAG" dist/SHA256SUMS --clobber
+          cat dist/SHA256SUMS
