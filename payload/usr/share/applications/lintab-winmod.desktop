@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=LinWinMod
+Comment=Edit Windows files, and browse the Windows registry (read-only)
+Exec=lintab-winmod
+Icon=drive-harddisk
+Categories=System;Utility;
+Keywords=windows;registry;regedit;files;ntfs;dual-boot;

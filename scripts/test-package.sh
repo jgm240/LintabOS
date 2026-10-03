@@ -30,6 +30,8 @@ docker run --rm -v "$PWD:/lintab" -w /lintab lintabos-builder bash -euo pipefail
            /usr/bin/lintab-extras /usr/bin/lintab-reading-mode /usr/bin/lintab-battery /usr/bin/lintab-battery-gui \
            /usr/bin/lintab-tablet-settings /usr/bin/lintab-wifi-fix /usr/bin/lintab-android /usr/bin/lintab-android-session /usr/share/lintabos/android/ComputerMode.apk \
            /usr/libexec/lintab/install-chromium /usr/libexec/lintab/remove-waydroid \
+           /usr/bin/lintab-winmod /usr/libexec/lintab/winmod-remount /usr/share/applications/lintab-winmod.desktop \
+           /usr/share/polkit-1/actions/org.lintabos.winmod.policy \
            /usr/share/wayland-sessions/lintab-android.desktop /usr/share/applications/lintab-android.desktop /usr/libexec/lintab/install-waydroid /usr/libexec/lintab/battery-limit \
            /usr/lib/systemd/system/lintab-battery-limit.service /usr/share/polkit-1/actions/org.lintabos.extras.policy \
            /usr/share/polkit-1/actions/org.lintabos.battery.policy /usr/share/applications/lintab-hwreport.desktop \
@@ -44,7 +46,7 @@ docker run --rm -v "$PWD:/lintab" -w /lintab lintabos-builder bash -euo pipefail
   shared=$(dpkg -L lintabos-core | while read -r f; do [ -f "$f" ] && dpkg -S "$f" 2>/dev/null; done | grep -v "^lintabos-core: " || true)
   [ -z "$shared" ] && echo "ok   every file is owned by lintabos-core alone" || { echo "FAIL shared files:"; echo "$shared"; exit 1; }
   echo "== new executables are executable, desktop files are valid, services enabled"
-  for f in /usr/bin/lintab-webapp /usr/libexec/lintab/school-mode-on /usr/libexec/lintab/school-mode-off /usr/libexec/lintab/install-waydroid /usr/libexec/lintab/battery-limit /usr/bin/lintab-android-session /usr/libexec/lintab/install-chromium /usr/libexec/lintab/remove-waydroid; do [ -x "$f" ] || { echo "NOT EXECUTABLE $f"; exit 1; }; done
+  for f in /usr/bin/lintab-webapp /usr/libexec/lintab/school-mode-on /usr/libexec/lintab/school-mode-off /usr/libexec/lintab/install-waydroid /usr/libexec/lintab/battery-limit /usr/bin/lintab-android-session /usr/libexec/lintab/install-chromium /usr/libexec/lintab/remove-waydroid /usr/libexec/lintab/winmod-remount; do [ -x "$f" ] || { echo "NOT EXECUTABLE $f"; exit 1; }; done
   apt-get install -y -qq --no-install-recommends desktop-file-utils >/dev/null 2>&1
   desktop-file-validate /usr/share/applications/lintab-*.desktop /etc/xdg/autostart/lintab-*.desktop /usr/share/wayland-sessions/lintab-android.desktop /usr/share/lintabos/extras/microsoft/*.desktop && echo "ok   desktop files validate"
   ls /etc/systemd/user/graphical-session.target.wants/lintab-tablet-mode.service >/dev/null && echo "ok   tablet-mode service enabled for all users"
@@ -61,7 +63,7 @@ docker run --rm -v "$PWD:/lintab" -w /lintab lintabos-builder bash -euo pipefail
   lintab-update status
   python3 - <<PY
 import sys; sys.path.insert(0, "/usr/lib/python3/dist-packages")
-import lintab.update, lintab.update_gui, lintab.bitlocker_gui, lintab.gui, lintab.desktops, lintab.touchsetup, lintab.xfce_rotate, lintab.uninstall, lintab.uninstall_gui, lintab.hwreport, lintab.extras, lintab.comfort, lintab.battery, lintab.battery_gui, lintab.tablet_gui, lintab.wifi, lintab.android
+import lintab.update, lintab.update_gui, lintab.bitlocker_gui, lintab.gui, lintab.desktops, lintab.touchsetup, lintab.xfce_rotate, lintab.uninstall, lintab.uninstall_gui, lintab.hwreport, lintab.extras, lintab.comfort, lintab.battery, lintab.battery_gui, lintab.tablet_gui, lintab.wifi, lintab.android, lintab.winmod, lintab.winmod_gui
 print("ok   python modules import (GTK stack present)")
 PY
   echo "== upgrade $V -> $NEXT"

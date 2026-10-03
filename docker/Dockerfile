@@ -31,4 +31,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends dislocker fuse3
 RUN apt-get update && apt-get install -y --no-install-recommends dpkg-dev fakeroot minisign xz-utils \
     && rm -rf /var/lib/apt/lists/*
 
+# LinWinMod: read-only Windows registry browsing (libhivex-bin is its hivexsh, used only to build test fixtures)
+RUN apt-get update && apt-get install -y --no-install-recommends python3-hivex libhivex-bin \
+    && rm -rf /var/lib/apt/lists/*
+
 WORKDIR /lintab

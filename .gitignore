@@ -41,3 +41,6 @@ payload/usr/bin/lintab-uninstall-launch
 payload/usr/bin/lintab-wifi-fix
 payload/usr/bin/lintab-android
 payload/usr/bin/lintab-android-session
+payload/usr/bin/lintab-winmod
+hivex-*/
+hivex_*

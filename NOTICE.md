@@ -55,6 +55,10 @@ Foundation.
   `zipalign` from Debian and, at build time only, the Android API jar (Apache-2.0) and the R8/D8 compiler (BSD-3-Clause/Apache-2.0) from Maven;
   none of those are shipped. It is signed with a throw-away key that is published in the repository (it protects nothing).
 
+- **LinWinMod** reads Windows registry hives with **hivex** (LGPL-2.1-or-later), via Debian's `python3-hivex`. `tests/fixtures/sample.hive`
+  is derived from the `hivex` project's own upstream test fixture (`images/minimal`, BSD-style, part of the hivex source package) with
+  LintabOS test data added; it is used only for this repository's own tests and is not installed on LintabOS.
+
 ## License of LintabOS's own code
 
 The original files of this project (installer, partitioner, BitLocker tools, scripts, configuration and artwork) are

@@ -97,6 +97,7 @@ dosfstools
 e2fsprogs
 rsync
 efibootmgr
+python3-hivex
 grub-efi-amd64
 grub-efi-amd64-signed
 shim-signed

@@ -32,6 +32,12 @@ It boots from a USB stick, installs with a touch-friendly installer, and can
 | Remove LintabOS | From the live USB: **Remove LintabOS** (welcome page, or `lintab-uninstall`). Deletes only the partition it can identify as LintabOS, grows Windows back into the space when that is safe (not BitLocker, not hibernated or flagged), cleans LintabOS's folder and boot entries from the EFI partition and puts Windows Boot Manager first. Refuses if no Windows is on the disk. Needs the phrase `REMOVE-LINTABOS` on the command line |
 | Update rollback | **LintabOS Updates** keeps a signature-checked copy of the version it replaces, runs a health check after installing, and goes back by itself if the new version is broken (`lintab-update rollback` does it on request) |
 | Hardware report | **Hardware Report** app (or `lintab-hwreport`): Wi-Fi, Bluetooth, fingerprint, sensors, cameras, folio, battery, storage, sleep. MAC/IP addresses, UUIDs, serial numbers, and your user and computer names are masked, Wi-Fi names are never collected, nothing is sent; you read it first and paste it into a GitHub issue |
+| LinWinMod | Edit the Windows **files** (read-write, same Fast-Startup/BitLocker checks as *Windows Files* --read-write) and **browse**
+  the Windows **registry** (SOFTWARE, SYSTEM, DEFAULT, each user's NTUSER.DAT/UsrClass.dat). **Read-only, no exceptions**: there
+  is no write path to the registry at all. **SAM and SECURITY are refused outright** — not hidden from a menu, refused at the
+  function that opens a hive, however the path is spelled — because they hold account password hashes and cached
+  credentials/LSA secrets, i.e. credential material, not configuration. See [docs/LEGAL.md](docs/LEGAL.md) for why no subset
+  of the registry can be safely offered as "editable" |
 | Android mode | After installing *Android apps* from Extras, **Android Mode** turns the whole tablet into a full-screen Android tablet (Waydroid inside `cage`, the setup Waydroid's own docs describe). It selects an "Android" login session for your next login and logs you out. Inside Android, the **Computer Mode** app (a small app LintabOS installs into Android) ends the session and brings back your normal desktop; **the power button is Android's power button**. The way out is checked first: if the Computer Mode listener can't start, the session ends instead of trapping you; a keyboard can still use Ctrl+Alt+F3. Untested on the Duet 3 |
 | LintabOS Extras | Optional downloads in one place, **each removable again** (Remove extras…; your own documents stay): **Rnote and Xournal++** (drawing, notes), the **Office pack**, **Waydroid** (Android apps) and **Bottles** (Windows programs through Wine). Flathub apps install for you only, without a password; Waydroid asks for an administrator. Not in the ISO, which stays under GitHub's 2 GiB limit |
 | Reading mode and auto-brightness | **Reading Mode** (GNOME): warm screen all day until switched off, your own Night Light settings put back afterwards; `--grey` is an experimental greyscale. Auto-brightness from the light sensor and an evening warm-up are on by default |
@@ -231,6 +237,12 @@ read from upstream sources and other people's probes, so treat them as expected-
 - **GRUB has no touch input**: the default boot menu needs the folio keyboard (or Bluetooth keyboard paired
   in firmware). The optional touch boot menu (rEFInd) only works with Secure Boot off, and whether the tablet's firmware
   passes touch to it is untested.
+- **LinWinMod**: SAM/SECURITY refusal (by name, case-insensitively, however the path is spelled, even for a file that is a
+  genuinely valid hive), hive discovery (never lists SAM/SECURITY even when present on disk), and reading real registry data —
+  every value type, nested keys, an empty key, a missing path, search — are tested against a real hive built from the `hivex`
+  project's own upstream test fixture (`tests/fixtures/sample.hive`); the privileged remount helper only ever touches the one
+  mount point `lintab-windows-files` already declared. **Not tested**: a real Windows installation's hives (sizes, depth,
+  encodings beyond what the fixture covers), and the file manager against a real NTFS mount.
 - **Android mode**: the login-session switching and restoring, the Computer Mode listener (answers only `/exit`, only on the Waydroid
   bridge address, fails closed), the app install step, and the session files are unit-tested against fakes; the Computer Mode APK is
   built, signed and checked with `aapt`/`apksigner`. **Not tested**: Waydroid itself on this tablet, cage and Android with touch and the

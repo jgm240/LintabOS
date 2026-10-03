@@ -122,6 +122,19 @@ source-offer coverage as other Debian packages (see `NOTICE.md`).
   machine. It is never sent automatically, so the maintainer receives only what a user chooses to paste into a public issue.
 - **Remove LintabOS** deletes data only on the user's explicit confirmation and only a partition it can identify as LintabOS.
 
+### LinWinMod: why the registry has no "safe subset" to edit
+
+A full write-capable registry editor with a blocklist (e.g. "everything except SAM and SECURITY") was considered and rejected:
+Windows does not separate security-relevant settings from cosmetic ones by hive or subtree cleanly enough for a blocklist to
+be safe. Three examples living entirely outside SAM/SECURITY: `Winlogon\AutoAdminLogon`/`DefaultPassword` (SOFTWARE) logs any
+account in with no password; a service's `ImagePath` (SYSTEM) can be pointed at an attacker binary that then runs as SYSTEM on
+the next boot; `Image File Execution Options\*\Debugger` (SOFTWARE) silently redirects launching one program to a different
+one. LinWinMod therefore has **no write path to the registry at all** — browsing only — and refuses to open SAM and SECURITY
+even for reading, since SAM yields NTLM password hashes directly and SECURITY holds LSA secrets and cached credentials: that
+is credential material, not configuration, regardless of read/write. The Windows **file** editing in LinWinMod is ordinary
+file management on a drive already mounted read-write (the same capability `lintab-windows-files --read-write` already has);
+it does not add a new way to change Windows, only a convenient entry point to the existing one.
+
 ## 3. The Tux logo
 
 - **Copyright:** Tux was created by Larry Ewing in 1996 with The GIMP. Per Wikipedia and a second source, he released it with
