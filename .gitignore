@@ -39,3 +39,5 @@ payload/usr/bin/lintab-battery-gui
 payload/usr/bin/lintab-uninstall-gui
 payload/usr/bin/lintab-uninstall-launch
 payload/usr/bin/lintab-wifi-fix
+payload/usr/bin/lintab-android
+payload/usr/bin/lintab-android-session

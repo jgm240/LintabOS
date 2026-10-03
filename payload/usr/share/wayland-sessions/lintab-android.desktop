@@ -1,0 +1,5 @@
+[Desktop Entry]
+Name=Android (Waydroid)
+Comment=The whole tablet as an Android tablet. Press the power button to leave.
+Exec=/usr/bin/lintab-android-session
+Type=Application

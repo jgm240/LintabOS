@@ -1,8 +1,13 @@
 [Desktop Entry]
 Type=Application
 Name=LintabOS Extras
-Comment=Optional downloads: drawing and notes, office, Android apps, Windows apps
+Comment=Optional downloads (Microsoft 365 web apps, drawing, office, Android, Windows apps), and removing them
 Exec=lintab-extras gui
 Icon=system-software-install
 Categories=System;
-Keywords=extras;rnote;xournal;libreoffice;waydroid;android;bottles;wine;
+Keywords=extras;rnote;xournal;libreoffice;waydroid;android;bottles;wine;microsoft;office;uninstall;remove;
+Actions=remove;
+
+[Desktop Action remove]
+Name=Remove extras…
+Exec=lintab-extras gui --remove

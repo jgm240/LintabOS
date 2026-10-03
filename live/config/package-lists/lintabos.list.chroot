@@ -3,8 +3,7 @@
 # it is named here.
 lintabos-core
 
-# ---- Microsoft 365 web apps (own windows via Chromium app mode), tablet-mode sound ----
-chromium
+# ---- Tablet-mode sound and helpers (Chromium for the Microsoft 365 web apps is an optional download in LintabOS Extras) ----
 pipewire-bin
 python3-pyudev
 zenity

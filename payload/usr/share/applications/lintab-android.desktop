@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Android Mode
+Comment=Turn the tablet into a full-screen Android tablet (Waydroid)
+Exec=lintab-android
+Icon=phone-symbolic
+Categories=System;
+Keywords=android;waydroid;apps;tablet;fullscreen;

@@ -1,0 +1,8 @@
+#!/bin/sh
+# SPDX-License-Identifier: MIT
+# The "Android" login session: Waydroid full screen in cage. logind's own reaction to the power button, the folio and the sleep
+# keys is held back for the whole session (the power button is Android's); the Computer Mode app inside Android is the way out.
+# See lintab.android.
+exec systemd-inhibit --what=handle-power-key:handle-suspend-key:handle-hibernate-key:handle-lid-switch \
+    --who="LintabOS Android mode" --why="the power button belongs to Android while it runs" \
+    /usr/bin/python3 -c 'import sys; sys.path.insert(0, "/usr/lib/python3/dist-packages"); from lintab.android import session_main; sys.exit(session_main())'

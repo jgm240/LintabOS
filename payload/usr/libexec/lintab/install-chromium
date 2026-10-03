@@ -1,0 +1,8 @@
+#!/bin/sh
+# SPDX-License-Identifier: MIT
+# Installs Chromium (used by the optional Microsoft 365 web apps, one window per app). Run through pkexec by lintab-extras.
+set -eu
+[ "$(id -u)" = 0 ] || { echo "must run as root" >&2; exit 1; }
+export DEBIAN_FRONTEND=noninteractive LC_ALL=C.UTF-8
+apt-get update
+apt-get install -y --no-install-recommends chromium

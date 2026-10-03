@@ -91,7 +91,7 @@ Things found and fixed during this review:
 
 ## 2b. Microsoft 365 shortcuts, OneDrive, Teams (added in 0.2.0)
 
-- LintabOS ships **launchers** that open Microsoft's own web apps (`office.com/launch/word`, `…/excel`, `…/powerpoint`,
+- LintabOS ships **launchers**, off by default and added by the user from LintabOS Extras (and removable there), that open Microsoft's own web apps (`office.com/launch/word`, `…/excel`, `…/powerpoint`,
   `…/onedrive`, `teams.microsoft.com`) in a Chromium window. No Microsoft code, logo or icon is copied; the launchers use
   generic icons from the desktop icon theme and say "(web)" in their names. Using those sites needs the user's own Microsoft
   account and is under Microsoft's terms, not ours. The names Word/Excel/PowerPoint/OneDrive/Teams are used only to tell people

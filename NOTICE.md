@@ -12,7 +12,7 @@ Foundation.
 - Windows and BitLocker are trademarks of Microsoft Corporation. They are named here only to describe what
   LintabOS can read, install beside, and boot.
 - Microsoft, Word, Excel, PowerPoint, OneDrive, Teams, Microsoft 365 and Office are trademarks of the Microsoft group of
-  companies. LintabOS only offers shortcuts that open Microsoft's own web sites in a window; it ships no Microsoft software,
+  companies. LintabOS only offers shortcuts, which you add yourself from LintabOS Extras, that open Microsoft's own web sites in a window; it ships no Microsoft software,
   logos or icons (generic desktop icons are used), and is not affiliated with or endorsed by Microsoft.
 - LibreOffice is a trademark of The Document Foundation; Teams for Linux is an unofficial community project (MIT), neither
   is shipped in the image: the optional Office Pack downloads them from Flathub.
@@ -47,8 +47,13 @@ Foundation.
   LibreOffice (MPL-2.0), Teams for Linux (GPL-3.0, unofficial), Bottles (GPL-3.0-or-later, runs Wine, LGPL-2.1-or-later) from Flathub, and
   **Waydroid** (GPL-3.0-or-later) from Debian backports. Waydroid downloads an Android system image from the Waydroid project; Google's
   apps are not included or enabled. None of these are in the ISO.
+- **cage** (MIT), a one-app Wayland compositor, is installed with Waydroid to show Android full screen in Android mode.
 - Android is a trademark of Google LLC, Wine is a trademark of the Wine project, Rnote, Xournal++, Bottles and Waydroid belong to their
   authors; they are named only to say what the Extras app can download.
+
+- The **Computer Mode** Android app (`android/computermode`, MIT) is built from this repository's source with `aapt`, `apksigner` and
+  `zipalign` from Debian and, at build time only, the Android API jar (Apache-2.0) and the R8/D8 compiler (BSD-3-Clause/Apache-2.0) from Maven;
+  none of those are shipped. It is signed with a throw-away key that is published in the repository (it protects nothing).
 
 ## License of LintabOS's own code
 

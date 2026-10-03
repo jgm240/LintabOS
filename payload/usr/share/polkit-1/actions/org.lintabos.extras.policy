@@ -12,4 +12,24 @@
     </defaults>
     <annotate key="org.freedesktop.policykit.exec.path">/usr/libexec/lintab/install-waydroid</annotate>
   </action>
+  <action id="org.lintabos.extras-chromium">
+    <description>Install Chromium (for the Microsoft 365 web apps)</description>
+    <message>Authentication is required to install Chromium</message>
+    <defaults>
+      <allow_any>no</allow_any>
+      <allow_inactive>no</allow_inactive>
+      <allow_active>auth_admin</allow_active>
+    </defaults>
+    <annotate key="org.freedesktop.policykit.exec.path">/usr/libexec/lintab/install-chromium</annotate>
+  </action>
+  <action id="org.lintabos.extras-remove-waydroid">
+    <description>Remove Waydroid and Android's data</description>
+    <message>Authentication is required to remove Waydroid and everything inside Android</message>
+    <defaults>
+      <allow_any>no</allow_any>
+      <allow_inactive>no</allow_inactive>
+      <allow_active>auth_admin</allow_active>
+    </defaults>
+    <annotate key="org.freedesktop.policykit.exec.path">/usr/libexec/lintab/remove-waydroid</annotate>
+  </action>
 </policyconfig>

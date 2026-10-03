@@ -6,6 +6,7 @@ set -eu
 export DEBIAN_FRONTEND=noninteractive LC_ALL=C.UTF-8
 apt-get update
 apt-get install -y --no-install-recommends -t trixie-backports waydroid
+apt-get install -y --no-install-recommends cage      # shows Waydroid full screen in Android mode
 # The kernel's Android IPC is a module here (no binderfs): load it with the devices Waydroid wants.
 modprobe binder_linux devices=binder,hwbinder,vndbinder 2>/dev/null || true
 if [ ! -e /var/lib/waydroid/waydroid.cfg ]; then

@@ -14,6 +14,7 @@ from lintab import extras  # noqa: E402
 
 def test_choices_are_validated_and_deduplicated():
     assert [e.key for e in extras.by_key(["windows", "drawing", "windows"])] == ["windows", "drawing"]
+    assert "microsoft" in [e.key for e in extras.CATALOG]
     with pytest.raises(ValueError, match="nope"):
         extras.by_key(["drawing", "nope"])
 
@@ -75,3 +76,100 @@ def test_the_waydroid_helper_is_valid_shell_and_does_what_it_says():
     assert "set -eu" in text and 'id -u' in text                       # refuses to run unprivileged, stops on errors
     policy = open(os.path.join(os.path.dirname(helper), "../../share/polkit-1/actions/org.lintabos.extras.policy")).read()
     assert "<allow_active>auth_admin</allow_active>" in policy and "/usr/libexec/lintab/install-waydroid" in policy
+
+
+# ------------------------------------------------- Microsoft apps: optional, per user --
+
+ROOT = os.path.join(os.path.dirname(__file__), "..")
+MS_FILES = ("lintab-word", "lintab-excel", "lintab-powerpoint", "lintab-onedrive", "lintab-teams", "lintab-connect-onedrive")
+
+
+def test_the_microsoft_apps_are_no_longer_part_of_the_base_system():
+    applications = os.listdir(os.path.join(ROOT, "payload/usr/share/applications"))
+    for name in MS_FILES:
+        assert f"{name}.desktop" not in applications                                   # not in every user's app grid by default
+        assert os.path.isfile(os.path.join(ROOT, "payload/usr/share/lintabos/extras/microsoft", f"{name}.desktop"))
+    ms = extras.by_key(["microsoft"])[0]
+    assert ms.kind == "launchers" and "Microsoft account" in ms.description
+
+
+def test_the_shortcuts_are_added_to_and_removed_from_the_users_own_folder_only(tmp_path):
+    src, dest, profile = tmp_path / "src", tmp_path / "home/applications", tmp_path / "home/webapps"
+    src.mkdir()
+    for name in ("lintab-word", "lintab-teams"):
+        (src / f"{name}.desktop").write_text("[Desktop Entry]\nName=x\n")
+    dest.mkdir(parents=True)
+    (dest / "my-own-app.desktop").write_text("[Desktop Entry]\nName=mine\n")
+    profile.mkdir(parents=True)
+    (profile / "Cookies").write_text("signed in")
+    assert extras.add_launchers("microsoft", str(src), str(dest)) == ["lintab-teams.desktop", "lintab-word.desktop"]
+    assert (dest / "lintab-word.desktop").exists()
+    removed = extras.remove_launchers("microsoft", str(src), str(dest), str(profile))
+    assert removed == ["lintab-teams.desktop", "lintab-word.desktop"]
+    assert (dest / "my-own-app.desktop").exists()                                      # never touches anything else
+    assert not profile.exists()                                                        # the Microsoft sign-in is forgotten
+
+
+def test_keeping_the_profile_is_possible(tmp_path):
+    src, dest, profile = tmp_path / "s", tmp_path / "d", tmp_path / "p"
+    for d in (src, dest, profile):
+        d.mkdir()
+    (src / "lintab-word.desktop").write_text("x")
+    (dest / "lintab-word.desktop").write_text("x")
+    extras.remove_launchers("microsoft", str(src), str(dest), str(profile), delete_profile=False)
+    assert profile.exists() and not (dest / "lintab-word.desktop").exists()
+
+
+def test_chromium_is_installed_only_when_missing_and_its_failure_is_not_fatal():
+    with_chromium = extras.plan(["microsoft"], have_chromium=True)
+    assert with_chromium == [("Adding Microsoft 365 web apps", ["lintab-extras", "add-launchers", "microsoft"])]
+    without = extras.plan(["microsoft"], have_chromium=False)
+    assert without[0][1] == ["pkexec", extras.CHROMIUM_HELPER] and without[1][1][:2] == ["lintab-extras", "add-launchers"]
+
+    def run(argv):
+        return 1 if argv[0] == "pkexec" else 0                                         # the password prompt was cancelled
+    assert extras.install(["microsoft"], run=run, log=lambda m: None, have_chromium=False) == {"microsoft": True}
+    assert extras.install(["microsoft"], run=lambda a: 1, log=lambda m: None, have_chromium=True) == {"microsoft": False}
+
+
+def test_a_failed_android_install_is_reported_as_failed():
+    assert extras.install(["android"], run=lambda a: 1, log=lambda m: None) == {"android": False}
+    assert extras.install(["android"], run=lambda a: 0, log=lambda m: None) == {"android": True}
+
+
+# ------------------------------------------------------------------- uninstalling --
+
+def test_removing_flatpak_extras_keeps_their_data_unless_asked():
+    keep = extras.plan_remove(["drawing"])
+    assert keep == [("Removing Drawing and notes", ["flatpak", "uninstall", "--user", "-y", "--noninteractive",
+                                                    "com.github.flxzt.rnote", "com.github.xournalpp.xournalpp"])]
+    assert "--delete-data" in extras.plan_remove(["windows"], delete_data=True)[0][1]
+    assert not any("pkexec" in a or "sudo" in a for _d, a in extras.plan_remove(["drawing", "office", "windows", "microsoft"]))
+
+
+def test_removing_android_leaves_android_mode_first_and_needs_the_polkit_helper():
+    steps = extras.plan_remove(["android"])
+    assert [a for _d, a in steps] == [["lintab-android", "back"], ["pkexec", extras.WAYDROID_REMOVE_HELPER]]
+    assert "DELETES" in extras.by_key(["android"])[0].removal_note                       # said plainly before confirming
+    results = extras.remove(["android"], run=lambda a: 1 if a[0] == "lintab-android" else 0, log=lambda m: None)
+    assert results == {"android": True}                                                  # leaving Android mode is best effort
+    assert extras.remove(["android"], run=lambda a: 1 if a[0] == "pkexec" else 0, log=lambda m: None) == {"android": False}
+
+
+def test_every_extra_says_what_removing_it_does():
+    for extra in extras.CATALOG:
+        assert extra.removal_note
+
+
+def test_the_removal_cli_and_the_helpers(monkeypatch, capsys):
+    monkeypatch.setattr(extras, "_run", lambda argv: 0)
+    assert extras.main(["remove", "drawing"]) == 0 and "drawing: removed" in capsys.readouterr().out
+    assert extras.main(["remove", "bogus"]) == 2
+    for helper in ("install-chromium", "remove-waydroid"):
+        path = os.path.join(ROOT, "payload/usr/libexec/lintab", helper)
+        assert subprocess.run(["sh", "-n", path]).returncode == 0
+        assert "id -u" in open(path).read() and "set -eu" in open(path).read()
+    remove_text = open(os.path.join(ROOT, "payload/usr/libexec/lintab/remove-waydroid")).read()
+    assert "rm -rf /var/lib/waydroid" in remove_text and "PKEXEC_UID" in remove_text    # only the invoking user's own folder
+    policy = open(os.path.join(ROOT, "payload/usr/share/polkit-1/actions/org.lintabos.extras.policy")).read()
+    assert "org.lintabos.extras-chromium" in policy and "org.lintabos.extras-remove-waydroid" in policy

@@ -1,0 +1,17 @@
+#!/bin/sh
+# SPDX-License-Identifier: MIT
+# Removes Waydroid (Android in a container), its Android image, and the tiny compositor used by Android mode. Run through
+# pkexec by lintab-extras. Deletes Android's data: apps and files inside Android are gone. The invoking user's own Waydroid
+# folder is removed too; nobody else's is touched.
+set -eu
+[ "$(id -u)" = 0 ] || { echo "must run as root" >&2; exit 1; }
+export DEBIAN_FRONTEND=noninteractive LC_ALL=C.UTF-8
+waydroid session stop 2>/dev/null || true
+systemctl disable --now waydroid-container.service 2>/dev/null || true
+apt-get purge -y waydroid cage
+rm -rf /var/lib/waydroid
+if [ -n "${PKEXEC_UID:-}" ]; then
+    home=$(getent passwd "$PKEXEC_UID" | cut -d: -f6)
+    [ -n "$home" ] && [ -d "$home/.local/share/waydroid" ] && rm -rf "$home/.local/share/waydroid"
+fi
+echo "Waydroid is removed."
