@@ -52,18 +52,41 @@ class FilesPage(Gtk.Box):
             label="Opens your Windows drive, read-write, in Files. Refused if Windows left the drive unclean or "
                   "hibernated (Fast Startup) — boot Windows and shut it down fully first.",
             wrap=True, xalign=0, css_classes=["dim-label"]))
+
+        self.picker_group = Adw.PreferencesGroup(
+            title="Examine a different partition", visible=False,
+            description="If the automatic search above didn't find your Windows drive — an unusual layout, or a "
+                        "second NTFS partition — pick any NTFS partition on this tablet by hand.")
+        picker_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8, margin_top=6, margin_bottom=6,
+                            margin_start=12, margin_end=12)
+        self.ntfs_picker = Gtk.DropDown(model=Gtk.StringList(), hexpand=True)
+        picker_row.append(self.ntfs_picker)
+        self.use_button = Gtk.Button(label="Use this partition")
+        self.use_button.connect("clicked", lambda _b: self._use_picked())
+        picker_row.append(self.use_button)
+        self.picker_group.add(picker_row)
+        self.append(self.picker_group)
+
         self._partition = None
+        self._ntfs_partitions: list = []
         threading.Thread(target=self._scan, daemon=True).start()
 
     def _scan(self) -> None:
         try:
             parts = winfiles.windows_partitions()
+            ntfs = winfiles.list_ntfs_partitions()
         except Exception as exc:  # noqa: BLE001 - must still reach idle_add, or the page is stuck on "Looking…" forever
-            GLib.idle_add(self._scanned, None, str(exc))
+            GLib.idle_add(self._scanned, None, [], str(exc))
             return
-        GLib.idle_add(self._scanned, parts, None)
+        GLib.idle_add(self._scanned, parts, ntfs, None)
 
-    def _scanned(self, parts: Optional[list], error: Optional[str]) -> bool:
+    def _scanned(self, parts: Optional[list], ntfs: list, error: Optional[str]) -> bool:
+        self._ntfs_partitions = ntfs
+        if ntfs:
+            model = self.ntfs_picker.get_model()
+            for part in ntfs:
+                model.append(f"{part.path}  ({part.size / (1024**3):.0f} GB)")
+            self.picker_group.set_visible(True)
         if error:
             self.status.set_text(f"Could not look at the disks: {error}")
             return False
@@ -74,11 +97,52 @@ class FilesPage(Gtk.Box):
                 encrypted = False
             self.status.set_text(
                 "This Windows drive is BitLocker-encrypted. Use “Unlock BitLocker Drive” first." if encrypted
-                else "No Windows partition was found on this tablet.")
+                else "No Windows partition was found automatically on this tablet."
+                     + (" Pick one below." if ntfs else ""))
             return False
         self._partition = max(parts, key=lambda p: p.size)
         self.status.set_text(f"Windows drive: {self._partition.path}")
         self.button.set_sensitive(True)
+        return False
+
+    def _use_picked(self) -> None:
+        index = self.ntfs_picker.get_selected()
+        if index < 0 or index >= len(self._ntfs_partitions):
+            return
+        chosen = self._ntfs_partitions[index]
+        self.use_button.set_sensitive(False)
+        self.button.set_sensitive(False)
+        self.status.set_text(f"Setting up {chosen.path}…")
+
+        def work() -> None:
+            try:
+                proc = subprocess.run(["pkexec", "lintab-windows-files", "enable", "--read-write",
+                                       "--partition", chosen.path], capture_output=True, text=True)
+            except Exception as exc:  # noqa: BLE001 - must still reach idle_add, or the page is stuck "Setting up…" forever
+                GLib.idle_add(self._picked_set_up, chosen, 1, str(exc))
+                return
+            GLib.idle_add(self._picked_set_up, chosen, proc.returncode,
+                         (proc.stderr or proc.stdout or "").strip())
+
+        threading.Thread(target=work, daemon=True).start()
+
+    def _picked_set_up(self, chosen, rc: int, message: str) -> bool:
+        self.use_button.set_sensitive(True)
+        if rc != 0:
+            self.status.set_text(message.replace("error: ", "") or "That didn't work (cancelled, or not allowed).")
+            return False
+        self._partition = chosen
+        self.status.set_text(f"Opening {chosen.path}…")
+
+        def work() -> None:
+            try:
+                proc = winmod.ensure_writable()
+            except Exception as exc:  # noqa: BLE001 - must still reach idle_add, or the page is stuck "Opening…" forever
+                GLib.idle_add(self._mounted, 1, str(exc))
+                return
+            GLib.idle_add(self._mounted, proc.returncode, (proc.stderr or proc.stdout or "").strip())
+
+        threading.Thread(target=work, daemon=True).start()
         return False
 
     def _open(self) -> None:

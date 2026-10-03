@@ -259,6 +259,14 @@ read from upstream sources and other people's probes, so treat them as expected-
   built, signed and checked with `aapt`/`apksigner`. **Not tested**: Waydroid itself on this tablet, cage and Android with touch and the
   panel's orientation, whether Android can reach the listener on a real Waydroid network (a firewall could block it), and whether the
   power key reaches Android as its power button.
+- **LinWinMod: pick any NTFS partition by hand (0.3.6)**. A real user's tablet had no partition `disks.find_windows()`
+  recognised as "the Windows install" (it needs a `\Windows\System32` folder found via a real mount, or to be the
+  biggest Microsoft-data partition on a disk whose ESP has a Windows boot manager — an unusual layout, or a secondary
+  NTFS data partition, can miss both). LinWinMod's Files tab now also lists **every** NTFS partition on the tablet in
+  a dropdown, with a "Use this partition" button, regardless of whether it looks like "the" Windows install. The same
+  Fast-Startup/dirty safety check still applies before anything is mounted read-write. Verified against a real NTFS
+  partition on a loop device, without a `\Windows\System32` folder, that automatic detection correctly misses and the
+  new picker correctly finds.
 - **LinWinMod bug fix: "sfdisk doesn't exist" (0.3.5)**. The 0.3.4 fix above made LinWinMod show its real error instead
   of hanging — and a real user's tablet then reported exactly that error. The cause: `sfdisk` (and `blkid`, `mount`, and
   every other partitioning tool) live in `/sbin` or `/usr/sbin`; `sudo`/`pkexec` add those to `PATH` for anything that

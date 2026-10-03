@@ -18,7 +18,7 @@ import pytest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "installer"))
 
-from lintab import bootmenu, disks, plan as planmod, uninstall  # noqa: E402
+from lintab import bootmenu, disks, plan as planmod, uninstall, winfiles  # noqa: E402
 from lintab.disks import GiB, MiB  # noqa: E402
 
 pytestmark = pytest.mark.skipif(
@@ -270,3 +270,61 @@ def test_remove_lintabos_refuses_a_disk_without_windows(windows_disk):
     d.partitions = [p for p in d.partitions if p.number not in (2, 3)]
     with pytest.raises(planmod.PlanError, match="No Windows installation"):
         uninstall.plan_uninstall(d, check_esp=False)
+
+
+# ------------------------------------------------- manual NTFS partition picker (LinWinMod) ---
+
+def test_a_plain_ntfs_data_partition_is_invisible_to_automatic_detection(tmp_path):
+    """find_windows() (what windows_partitions() relies on) needs a \\Windows\\System32 folder, or to be the
+    biggest Microsoft-data partition on a disk with a Windows boot manager on its ESP. A plain NTFS data partition
+    with neither is exactly what the manual picker (list_ntfs_partitions()) exists for."""
+    img = tmp_path / "disk.img"
+    with open(img, "wb") as f:
+        f.truncate(4 * GiB)
+    loop = sh("losetup", "--find", "--show", "--partscan", str(img)).strip()
+    try:
+        sh("sfdisk", loop, input=f"label: gpt\nsize=3900MiB, type={disks.GUID_MS_BASIC_DATA}, name=Data\n")
+        part = f"{loop}p1"
+        for _ in range(50):
+            if os.path.exists(part):
+                break
+            subprocess.run(["sleep", "0.1"])
+        sh("mkfs.ntfs", "-Q", "-F", "-L", "Data", part)
+
+        d = disks.read_disk(loop)
+        assert disks.find_windows(d) is None                           # confirmed on a real NTFS filesystem, not a guess
+    finally:
+        subprocess.run(["losetup", "-d", loop], capture_output=True)
+
+
+def test_enable_with_an_explicit_partition_sets_up_exactly_that_one(tmp_path):
+    """The CLI --partition flag: lintab-windows-files enable --read-write --partition PATH must point the fstab
+    entry at a real, chosen, non-"Windows" NTFS partition (real blkid UUID included), even though automatic
+    detection would never have offered it."""
+    img = tmp_path / "disk.img"
+    with open(img, "wb") as f:
+        f.truncate(4 * GiB)
+    loop = sh("losetup", "--find", "--show", "--partscan", str(img)).strip()
+    try:
+        sh("sfdisk", loop, input=f"label: gpt\nsize=3900MiB, type={disks.GUID_MS_BASIC_DATA}, name=Data\n")
+        part = f"{loop}p1"
+        for _ in range(50):
+            if os.path.exists(part):
+                break
+            subprocess.run(["sleep", "0.1"])
+        sh("mkfs.ntfs", "-Q", "-F", "-L", "Data", part)
+        uuid = sh("blkid", "-s", "UUID", "-o", "value", part).strip()
+        d = disks.read_disk(loop)
+        assert disks.find_windows(d) is None                           # not "the Windows install" by automatic detection
+
+        fstab = tmp_path / "fstab"
+        fstab.write_text("UUID=root / ext4 defaults 0 1\n")
+        root = tmp_path / "root"
+        # mirrors what `lintab-windows-files enable --read-write --partition PATH` does: a single real partition,
+        # explicitly chosen (not auto-picked by size), through add_to_fstab (the function the CLI itself calls).
+        chosen_part = winfiles.WindowsPartition(part, uuid, d.partitions[0].size)
+        chosen = winfiles.add_to_fstab(str(fstab), 1000, 1000, root=str(root), read_write=True, partitions=[chosen_part])
+        assert chosen.path == part and chosen.uuid == uuid
+        assert f"UUID={uuid}" in fstab.read_text() and "rw," in fstab.read_text()
+    finally:
+        subprocess.run(["losetup", "-d", loop], capture_output=True)

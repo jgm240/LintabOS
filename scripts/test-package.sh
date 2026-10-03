@@ -31,7 +31,7 @@ docker run --rm -v "$PWD:/lintab" -w /lintab lintabos-builder bash -euo pipefail
            /usr/bin/lintab-tablet-settings /usr/bin/lintab-wifi-fix /usr/bin/lintab-android /usr/bin/lintab-android-session /usr/share/lintabos/android/ComputerMode.apk \
            /usr/libexec/lintab/install-chromium /usr/libexec/lintab/remove-waydroid \
            /usr/bin/lintab-winmod /usr/libexec/lintab/winmod-remount /usr/share/applications/lintab-winmod.desktop \
-           /usr/share/polkit-1/actions/org.lintabos.winmod.policy \
+           /usr/share/polkit-1/actions/org.lintabos.winmod.policy /usr/share/polkit-1/actions/org.lintabos.windows-files.policy \
            /usr/bin/lintab-sleep-mode /usr/bin/lintab-sleep-mode-gui /usr/libexec/lintab/sleep-mode-set \
            /usr/libexec/lintab/sleep-mode-apply /usr/libexec/lintab/sleep-guard-run \
            /usr/lib/systemd/system/lintab-sleep-mode-apply.service /usr/lib/systemd/system/lintab-sleep-guard.service \

@@ -255,4 +255,4 @@ def test_every_background_worker_in_the_gui_catches_its_own_exceptions():
         if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and calls_idle_add(node):
             assert has_try(node), f"{node.name} calls GLib.idle_add without a try/except around it"
             checked += 1
-    assert checked >= 4   # _scan, _open's work(), _checked's work(), _scan_hives — also fails if one of them is removed
+    assert checked >= 6   # _scan, _open, _checked, _scan_hives, _use_picked, _picked_set_up's work() closures

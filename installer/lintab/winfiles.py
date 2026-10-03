@@ -64,7 +64,10 @@ def apply_block(fstab: str, block: Optional[str]) -> str:
 
 
 def windows_partitions() -> list[WindowsPartition]:
-    """Plain (not BitLocker) NTFS Windows partitions on this computer's disks."""
+    """The partition(s) that look like "the Windows install" on this computer's disks: plain (not BitLocker) NTFS,
+    and either holding a \\Windows\\System32 folder or the biggest Microsoft-data partition on a disk whose ESP has a
+    Windows boot manager (see disks.find_windows). An unusual layout — a secondary NTFS data partition, one without
+    a detectable System32 for whatever reason — won't show up here; see list_ntfs_partitions() for those."""
     from . import disks
     found = []
     for disk in disks.list_disks(hide=""):
@@ -76,6 +79,21 @@ def windows_partitions() -> list[WindowsPartition]:
         uuid = disks.run(["blkid", "-s", "UUID", "-o", "value", part.path], check=False).stdout.strip()
         if uuid:
             found.append(WindowsPartition(part.path, uuid, part.size))
+    return found
+
+
+def list_ntfs_partitions() -> list[WindowsPartition]:
+    """Every NTFS partition on every disk, not just the one(s) windows_partitions() recognises as "the Windows
+    install". For picking a partition by hand when automatic detection finds nothing. BitLocker-encrypted partitions
+    are not NTFS until unlocked, so they aren't listed; use Unlock BitLocker Drive first."""
+    from . import disks
+    found = []
+    for disk in disks.list_disks(hide=""):
+        for part in disk.partitions:
+            if part.fstype == "ntfs" and not disks.is_bitlocker(part):
+                uuid = disks.run(["blkid", "-s", "UUID", "-o", "value", part.path], check=False).stdout.strip()
+                if uuid:
+                    found.append(WindowsPartition(part.path, uuid, part.size))
     return found
 
 
@@ -111,6 +129,7 @@ def main(argv: Optional[list[str]] = None) -> int:
     ap.add_argument("action", choices=["status", "enable", "disable"], nargs="?", default="status")
     ap.add_argument("--user", help="who the files belong to (default: the user who ran sudo/pkexec)")
     ap.add_argument("--read-write", action="store_true", help="allow writing (refused if Windows left the drive unclean)")
+    ap.add_argument("--partition", help="use this NTFS partition (e.g. /dev/sda3) instead of picking one automatically")
     args = ap.parse_args(argv)
 
     if args.action == "status":
@@ -135,7 +154,14 @@ def main(argv: Optional[list[str]] = None) -> int:
         return 0
 
     uid, gid = _owner(args.user)
-    parts = windows_partitions()
+    if args.partition:
+        chosen = [p for p in windows_partitions() + list_ntfs_partitions() if p.path == args.partition]
+        if not chosen:
+            print(f"No NTFS partition found at {args.partition}.", file=sys.stderr)
+            return 2
+        parts = chosen[:1]
+    else:
+        parts = windows_partitions()
     if not parts:
         print("No Windows partition found (or it is BitLocker-encrypted: use Unlock BitLocker Drive).", file=sys.stderr)
         return 2
@@ -146,6 +172,7 @@ def main(argv: Optional[list[str]] = None) -> int:
             print("Refusing read-write: Windows left this drive unclean or hibernated (Fast Startup). "
                   "Boot Windows, run `powercfg /h off`, shut down fully, then try again.", file=sys.stderr)
             return 3
+    subprocess.run(["umount", MOUNT_POINT], capture_output=True)  # a stale mount of a previous partition must not linger
     part = add_to_fstab("/etc/fstab", uid, gid, read_write=args.read_write, partitions=parts)
     subprocess.run(["systemctl", "daemon-reload"], capture_output=True)
     print(f"Windows ({part.path}) will show as “Windows” in Files, {'read-write' if args.read_write else 'read-only'}.")

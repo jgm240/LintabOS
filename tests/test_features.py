@@ -16,7 +16,7 @@ import pytest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "installer"))
 
-from lintab import bootmenu, school, tablet, winfiles  # noqa: E402
+from lintab import bootmenu, disks, school, tablet, winfiles  # noqa: E402
 
 # ---------------------------------------------------------------- tablet mode --
 
@@ -141,6 +141,45 @@ def test_fstab_block_is_added_replaced_and_removed_without_touching_other_lines(
     assert twice.count(winfiles.BEGIN) == 1 and "UUID=BBBB" in twice and "UUID=AAAA" not in twice
     assert winfiles.apply_block(twice, None) == original
     assert winfiles.apply_block(original.rstrip("\n"), winfiles.fstab_block("C", 1, 1)).startswith(original.rstrip("\n") + "\n")
+
+
+def test_list_ntfs_partitions_finds_what_automatic_detection_misses(monkeypatch):
+    """list_ntfs_partitions() exists because windows_partitions() (automatic detection) needs a \\Windows\\System32
+    folder, or to be the biggest Microsoft-data partition on a disk with a Windows boot manager — an NTFS partition
+    satisfying neither (an unusual layout, a secondary data partition) is still real and still worth examining."""
+    from lintab.disks import Disk, GiB, MiB, Partition
+
+    windows = Partition(1, "/dev/sdz1", 0, 50 * GiB, disks.GUID_MS_BASIC_DATA, "win-uuid", name="Windows", fstype="ntfs")
+    data = Partition(2, "/dev/sdz2", 50 * GiB, 20 * GiB, disks.GUID_MS_BASIC_DATA, "data-ignored", name="Data", fstype="ntfs")
+    locked = Partition(3, "/dev/sdz3", 70 * GiB, 10 * GiB, disks.GUID_MS_BASIC_DATA, "bl-uuid", name="BL", fstype="bitlocker")
+    other_fs = Partition(4, "/dev/sdz4", 80 * GiB, 5 * GiB, disks.GUID_LINUX_FS, "linux-uuid", name="Linux", fstype="ext4")
+    disk = Disk(path="/dev/sdz", size=120 * GiB, sector_size=512, model="Test", transport="usb", removable=False,
+               label="gpt", first_usable=MiB, last_usable=120 * GiB - MiB, partitions=[windows, data, locked, other_fs])
+
+    monkeypatch.setattr(disks, "list_disks", lambda hide="": [disk])
+    monkeypatch.setattr(disks, "find_windows", lambda d: windows)           # automatic detection: only the first one
+    monkeypatch.setattr(disks, "run", lambda argv, **k: __import__("subprocess").CompletedProcess(
+        argv, 0, {"/dev/sdz1": "win-uuid", "/dev/sdz2": "data-uuid"}.get(argv[-1], ""), ""))
+
+    auto = winfiles.windows_partitions()
+    assert [p.path for p in auto] == ["/dev/sdz1"]                         # unchanged: still just "the" Windows partition
+
+    manual = winfiles.list_ntfs_partitions()
+    assert sorted(p.path for p in manual) == ["/dev/sdz1", "/dev/sdz2"]    # both plain NTFS partitions...
+    assert "/dev/sdz3" not in [p.path for p in manual]                     # ...never the BitLocker one...
+    assert "/dev/sdz4" not in [p.path for p in manual]                     # ...never a non-NTFS one
+    data_found = next(p for p in manual if p.path == "/dev/sdz2")
+    assert data_found.uuid == "data-uuid" and data_found.size == 20 * GiB
+
+
+def test_cli_partition_lookup_falls_back_from_auto_detected_to_any_ntfs_partition():
+    """Mirrors exactly what `lintab-windows-files enable --partition PATH` looks up: the automatically detected
+    Windows partition(s) plus every NTFS partition, filtered to the one path asked for."""
+    auto = [winfiles.WindowsPartition("/dev/sda3", "AUTO", 10)]
+    all_ntfs = [winfiles.WindowsPartition("/dev/sda3", "AUTO", 10), winfiles.WindowsPartition("/dev/sdb1", "DATA", 5)]
+    chosen = [p for p in auto + all_ntfs if p.path == "/dev/sdb1"]
+    assert len(chosen) == 1 and chosen[0].uuid == "DATA"               # found even though it's not "the" Windows partition
+    assert [p for p in auto + all_ntfs if p.path == "/dev/nonexistent"] == []
 
 
 def test_installer_hook_writes_the_biggest_windows_partition(tmp_path):
