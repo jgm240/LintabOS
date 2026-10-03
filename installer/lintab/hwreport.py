@@ -54,7 +54,14 @@ SECTIONS: list[tuple[str, list[str]]] = [
                                                     "busctl --system get-property net.hadess.SensorProxy /net/hadess/SensorProxy net.hadess.SensorProxy AccelerometerOrientation 2>&1"]),
     ("Cameras", ["sh", "-c", "cam --list 2>&1 | grep -v -E 'INFO|WARN'; v4l2-ctl --list-devices 2>&1 | head -30; "
                              "journalctl -k -b --no-pager 2>&1 | grep -i -E 'ipu6|ipu-bridge|int3472|ov[0-9]{4}|hi[0-9]{3,4}|imx[0-9]{3}' | tail -15"]),
-    ("Keyboard, folio and touch", ["sh", "-c", "lintab-tablet-mode status 2>&1; grep -E '^(N: Name|H: Handlers)' /proc/bus/input/devices 2>&1 | paste - - | cut -c1-150"]),
+    ("Keyboard and folio", ["sh", "-c", "lintab-tablet-mode status 2>&1; grep -E '^(N: Name|H: Handlers)' /proc/bus/input/devices 2>&1 | paste - - | cut -c1-150"]),
+    ("Touchscreen", ["sh", "-c", "echo '-- devices tagged as a touchscreen by udev'; "
+                                "for f in /dev/input/event*; do p=$(udevadm info -q property -n \"$f\" 2>/dev/null); "
+                                "echo \"$p\" | grep -q 'ID_INPUT_TOUCHSCREEN=1' && echo \"$f: $(echo \\\"$p\\\" | grep ^NAME=)\"; done; "
+                                "echo '-- what libinput (what GNOME actually uses) sees'; "
+                                "libinput list-devices 2>&1 | grep -B1 -A5 -iE 'touch|elan|goodix|melfas|focaltech'; "
+                                "echo '-- kernel messages about the touch controller'; "
+                                "journalctl -k -b --no-pager 2>&1 | grep -iE 'i2c_hid|hid-multitouch|touchscreen|goodix|elan_i2c|elants' | tail -30"]),
     ("Battery", ["sh", "-c", "for b in /sys/class/power_supply/*; do echo \"== $b\"; for f in type status capacity energy_full energy_full_design "
                              "charge_full charge_full_design cycle_count charge_control_end_threshold technology; do "
                              "[ -r $b/$f ] && echo \"$f=$(cat $b/$f)\"; done; done"]),

@@ -259,6 +259,10 @@ read from upstream sources and other people's probes, so treat them as expected-
   built, signed and checked with `aapt`/`apksigner`. **Not tested**: Waydroid itself on this tablet, cage and Android with touch and the
   panel's orientation, whether Android can reach the listener on a real Waydroid network (a firewall could block it), and whether the
   power key reaches Android as its power button.
+- **Touchscreen diagnostics in Hardware Report (0.3.7)**: a reported touchscreen problem has no real diagnostic yet
+  (unlike Wi-Fi, fingerprint and sleep). The report now shows whether udev tags any device as a touchscreen, what
+  `libinput` (what GNOME actually uses for input) sees, and the kernel's own messages about the touch controller.
+  **Not fixed** — there's no data yet to know what's actually wrong; this is step one, same as the Wi-Fi tool before it.
 - **LinWinMod: pick any NTFS partition by hand (0.3.6)**. A real user's tablet had no partition `disks.find_windows()`
   recognised as "the Windows install" (it needs a `\Windows\System32` folder found via a real mount, or to be the
   biggest Microsoft-data partition on a disk whose ESP has a Windows boot manager — an unusual layout, or a secondary

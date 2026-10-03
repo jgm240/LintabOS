@@ -43,7 +43,8 @@ def test_report_has_every_section_and_survives_a_broken_command():
         return 0, "Network controller [0280]: Intel AX201 [8086:a0f0]\nmac 3c:e9:f7:12:ab:cd"
     report = hwreport.generate(run, user="ada", host="ducky", now=datetime.datetime(2026, 10, 2, 12, 0))
     for title in ("System", "Wi-Fi: devices and drivers", "Wi-Fi: kernel messages", "Bluetooth", "Fingerprint reader",
-                  "Accelerometer and light sensor", "Sleep and resume", "Cameras", "Keyboard, folio and touch", "Battery", "LintabOS"):
+                  "Accelerometer and light sensor", "Sleep and resume", "Cameras", "Keyboard and folio", "Touchscreen",
+                  "Battery", "LintabOS"):
         assert f"## {title}" in report
     assert "2026-10-02 12:00" in report and "3c:e9:f7:**:**:**" in report and "12:ab:cd" not in report
     assert "(command not found)" in report                              # the failure is shown, not fatal
