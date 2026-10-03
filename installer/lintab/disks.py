@@ -11,12 +11,19 @@ from __future__ import annotations
 import json
 import os
 import re
+import shutil
 import subprocess
 from dataclasses import dataclass, field
 from typing import Optional
 
 MiB = 1024 * 1024
 GiB = 1024 * MiB
+
+# sfdisk, blkid, mount and friends live in /sbin or /usr/sbin. sudo/pkexec's "secure_path" puts those on PATH for
+# anything run as root, but a plain unprivileged desktop session often does not — and this module is explicitly meant
+# to be safe to call unprivileged (see the module docstring). Without this, a tool that is genuinely installed can
+# still fail with "no such file or directory" purely because of where the caller's PATH happened to look.
+_SBIN_DIRS = ("/usr/sbin", "/sbin", "/usr/local/sbin")
 
 # GPT partition type GUIDs (lower-case, as sfdisk prints them).
 GUID_ESP = "c12a7328-f81f-11d2-ba4b-00a0c93ec93b"
@@ -31,7 +38,22 @@ class DiskError(RuntimeError):
     pass
 
 
+def resolve_executable(name: str, which=shutil.which, environ=os.environ) -> str:
+    """The full path to ``name``, trying the inherited PATH first and then the usual sbin directories. Falls back to
+    the bare name, unchanged, if it can't be found anywhere — so the resulting error is the familiar, clear "no such
+    file or directory" from actually trying to run it, rather than this function silently hiding the problem."""
+    if "/" in name:        # already a path (or deliberately not a plain command name): leave it alone
+        return name
+    found = which(name)
+    if found:
+        return found
+    extended = os.pathsep.join([environ.get("PATH", ""), *_SBIN_DIRS])
+    return which(name, path=extended) or name
+
+
 def run(argv: list[str], check: bool = True, input: Optional[str] = None) -> subprocess.CompletedProcess:
+    if argv:
+        argv = [resolve_executable(argv[0]), *argv[1:]]
     proc = subprocess.run(argv, capture_output=True, text=True, input=input)
     if check and proc.returncode != 0:
         raise DiskError(f"{' '.join(argv)} failed ({proc.returncode}): {(proc.stderr or proc.stdout).strip()}")

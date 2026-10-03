@@ -259,6 +259,15 @@ read from upstream sources and other people's probes, so treat them as expected-
   built, signed and checked with `aapt`/`apksigner`. **Not tested**: Waydroid itself on this tablet, cage and Android with touch and the
   panel's orientation, whether Android can reach the listener on a real Waydroid network (a firewall could block it), and whether the
   power key reaches Android as its power button.
+- **LinWinMod bug fix: "sfdisk doesn't exist" (0.3.5)**. The 0.3.4 fix above made LinWinMod show its real error instead
+  of hanging — and a real user's tablet then reported exactly that error. The cause: `sfdisk` (and `blkid`, `mount`, and
+  every other partitioning tool) live in `/sbin` or `/usr/sbin`; `sudo`/`pkexec` add those to `PATH` for anything that
+  elevates first (the installer, Remove LintabOS), but LinWinMod's disk scan deliberately runs **unprivileged** — it's
+  read-only, so it shouldn't need a password just to open the app — and a plain desktop session's `PATH` often doesn't
+  include `/sbin`/`/usr/sbin` at all. `sfdisk` was genuinely installed; it just couldn't be found by name. `disks.run()`
+  (used throughout the partitioner) now resolves a tool's full path, trying the inherited `PATH` first and falling back
+  to the usual sbin directories, so a tool that's actually there is actually found — verified by reproducing the exact
+  failure (a `PATH` with no sbin directories) and confirming `sfdisk` now resolves and runs.
 - **LinWinMod bug fix (0.3.4)**: the Files and Registry pages could get stuck on their loading message forever if disk or
   hive discovery raised an exception — a background thread dying silently before the GUI callback that updates the label
   ever ran. A real user hit exactly this ("stuck at Looking for Windows..."). All four background workers in the window now

@@ -73,7 +73,7 @@ def windows_partitions() -> list[WindowsPartition]:
         part = disks.find_windows(disk)
         if part is None or disks.is_bitlocker(part):
             continue
-        uuid = subprocess.run(["blkid", "-s", "UUID", "-o", "value", part.path], capture_output=True, text=True).stdout.strip()
+        uuid = disks.run(["blkid", "-s", "UUID", "-o", "value", part.path], check=False).stdout.strip()
         if uuid:
             found.append(WindowsPartition(part.path, uuid, part.size))
     return found
