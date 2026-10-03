@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Sleep & Power Button
+Comment=Choose what the power button and closing the folio do
+Exec=lintab-sleep-mode-gui
+Icon=preferences-system-power-symbolic
+Categories=Settings;
+Keywords=sleep;suspend;power button;lid;folio;wake;freeze;hang;

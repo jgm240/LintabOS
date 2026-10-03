@@ -7,6 +7,8 @@ remove|purge)
         systemctl --global disable lintab-update-check.timer >/dev/null 2>&1 || true
         systemctl --global disable lintab-tablet-mode.service >/dev/null 2>&1 || true
         systemctl disable lintab-battery-limit.service >/dev/null 2>&1 || true
+        systemctl disable lintab-sleep-mode-apply.service >/dev/null 2>&1 || true
+        systemctl disable lintab-sleep-guard.service >/dev/null 2>&1 || true
     fi
     if command -v dconf >/dev/null 2>&1; then dconf update || true; fi
     ;;

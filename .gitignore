@@ -44,3 +44,5 @@ payload/usr/bin/lintab-android-session
 payload/usr/bin/lintab-winmod
 hivex-*/
 hivex_*
+payload/usr/bin/lintab-sleep-mode
+payload/usr/bin/lintab-sleep-mode-gui

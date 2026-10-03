@@ -1,0 +1,13 @@
+[Unit]
+Description=LintabOS: handle the power button and folio switch (GNOME/logind defaults can get stuck in a sleep that never wakes)
+After=multi-user.target lintab-sleep-mode-apply.service
+
+[Service]
+ExecStart=/usr/bin/systemd-inhibit --what=handle-power-key:handle-lid-switch --who="LintabOS Sleep Guard" \
+    --why="the power button and folio are handled by LintabOS so the tablet cannot get stuck asleep" --mode=block \
+    /usr/libexec/lintab/sleep-guard-run
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

@@ -186,6 +186,17 @@ IPU6 → libcamera, LEDs, OSK) and says which one is missing.
 
 These were reported by someone running LintabOS on a real IdeaPad Duet 3 and are **not fixed yet**; the cause of each is still unknown:
 
+- **The tablet doesn't turn back on after the power button or closing the folio** — Fixed (0.3.3) as far as software can, in
+  two parts. (1) Where the firmware offers real "deep" (S3) sleep as well as "s2idle", LintabOS selects "deep" at every boot:
+  this is the single most common fix for exactly this symptom on this class of Intel hardware, because s2idle depends on
+  every driver's own resume code behaving correctly, where deep/S3 instead powers most of the system off and back on. (2)
+  **Sleep & Power Button** lets you choose what the power button and folio-close actually do (Suspend / Lock the screen only
+  / Do nothing); LintabOS's own small service (`lintab-sleep-guard`) takes them over directly, the same way GNOME itself
+  takes them over from systemd-logind, because GNOME hardcodes "tablets always suspend" for the power button and has no
+  setting for the lid switch at all. If suspend still doesn't come back reliably on your tablet even with deep sleep
+  preferred, switch both to "Lock the screen only" — it can't get stuck, because it never suspends. **Not verified on real
+  hardware** (no Duet 3 to test on); the `mem_sleep` and GNOME-hardcoding facts this is built on were checked against the
+  kernel's own sysfs documentation and `gnome-settings-daemon`'s own schema, not guessed.
 - **Wi-Fi disappeared.** `sudo lintab-wifi-fix` (0.3.0) undoes everything in software that can stop Wi-Fi (rfkill blocks, a disabled radio, stopped or masked services, a driver that didn't load) and reports config or missing firmware it can't change on its own. It can't help if the Wi-Fi chip isn't detected at all.
 - **Fingerprint login doesn't work.**
 - **Pressing the power button or closing the folio leaves the tablet dead until it is force-restarted.** Real hibernation can't work (LintabOS uses zram only, no swap file), so this is most likely suspend that never resumes. Until it is fixed, `sudo systemctl mask sleep.target suspend.target hibernate.target hybrid-sleep.target` and setting the power button to "interactive" keep the tablet from sleeping at all.
@@ -255,6 +266,12 @@ read from upstream sources and other people's probes, so treat them as expected-
   its refusal to collect secrets, Extras' install logic, reading mode, and battery maths are unit-tested. **Not tested**: any of this on the
   tablet, Waydroid (the kernel offers Android's binder as a module, which should work, but nobody has tried), Bottles, Rnote and Xournal++
   with a pen, the light sensor, and whether the Duet's firmware offers a charge limit.
+- **Sleep & Power Button**: the deep-sleep preference (every realistic `/sys/power/mem_sleep` format, and the three cases —
+  switches, already selected, no alternative offered), power-button/lid-switch device detection (including a device with only
+  one handler, which a first version of this got wrong and a test caught), event classification (press vs. release vs.
+  auto-repeat, lid close vs. open), and the dispatch loop (surviving a device it can't open, never raising out of the action
+  it performs) are all tested against fakes. **Not tested**: a real power button or lid switch, and whether deep sleep (where
+  offered) actually fixes the wake-up problem on this tablet — that can only be confirmed on the hardware.
 - **KDE and Xfce**: the install order, GDM-stays-default guard, failure handling, DNS handling, touch settings, rotation maths and
   per-desktop keyboard commands are tested (`tests/test_desktops.py`); the Xfce xfconf keys and Onboard's gsettings keys were checked
   against the real packages in Debian 13, and both package lists resolve there. **Not tested**: an actual KDE or Xfce session on the

@@ -1,0 +1,11 @@
+[Unit]
+Description=LintabOS: prefer deep sleep over s2idle when the firmware offers it
+After=multi-user.target
+Before=lintab-sleep-guard.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/libexec/lintab/sleep-mode-apply
+
+[Install]
+WantedBy=multi-user.target
