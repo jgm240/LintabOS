@@ -56,12 +56,22 @@ class FilesPage(Gtk.Box):
         threading.Thread(target=self._scan, daemon=True).start()
 
     def _scan(self) -> None:
-        parts = winfiles.windows_partitions()
-        GLib.idle_add(self._scanned, parts)
+        try:
+            parts = winfiles.windows_partitions()
+        except Exception as exc:  # noqa: BLE001 - must still reach idle_add, or the page is stuck on "Looking…" forever
+            GLib.idle_add(self._scanned, None, str(exc))
+            return
+        GLib.idle_add(self._scanned, parts, None)
 
-    def _scanned(self, parts: list) -> bool:
+    def _scanned(self, parts: Optional[list], error: Optional[str]) -> bool:
+        if error:
+            self.status.set_text(f"Could not look at the disks: {error}")
+            return False
         if not parts:
-            encrypted = any(disks.is_bitlocker(p) for d in disks.list_disks() for p in d.partitions if p.is_ms_data)
+            try:
+                encrypted = any(disks.is_bitlocker(p) for d in disks.list_disks() for p in d.partitions if p.is_ms_data)
+            except Exception:  # noqa: BLE001 - a failed extra check must not hide the real "no Windows found" message
+                encrypted = False
             self.status.set_text(
                 "This Windows drive is BitLocker-encrypted. Use “Unlock BitLocker Drive” first." if encrypted
                 else "No Windows partition was found on this tablet.")
@@ -76,12 +86,20 @@ class FilesPage(Gtk.Box):
         self.status.set_text("Checking the drive…")
 
         def work() -> None:
-            info = bitlocker.probe(self._partition.path)
-            GLib.idle_add(self._checked, info)
+            try:
+                info = bitlocker.probe(self._partition.path)
+            except Exception as exc:  # noqa: BLE001 - must still reach idle_add, or the page is stuck "Checking…" forever
+                GLib.idle_add(self._checked, None, str(exc))
+                return
+            GLib.idle_add(self._checked, info, None)
 
         threading.Thread(target=work, daemon=True).start()
 
-    def _checked(self, info) -> bool:
+    def _checked(self, info, error: Optional[str] = None) -> bool:
+        if error:
+            self.status.set_text(f"Could not check the drive: {error}")
+            self.button.set_sensitive(True)
+            return False
         if not info.healthy:
             messages = {
                 "dirty": "Windows flagged this drive for a consistency check. Boot Windows, let it check the disk, "
@@ -95,7 +113,11 @@ class FilesPage(Gtk.Box):
         self.status.set_text("Opening…")
 
         def work() -> None:
-            proc = winmod.ensure_writable()
+            try:
+                proc = winmod.ensure_writable()
+            except Exception as exc:  # noqa: BLE001 - must still reach idle_add, or the page is stuck "Opening…" forever
+                GLib.idle_add(self._mounted, 1, str(exc))
+                return
             GLib.idle_add(self._mounted, proc.returncode, (proc.stderr or proc.stdout or "").strip())
 
         threading.Thread(target=work, daemon=True).start()
@@ -151,10 +173,17 @@ class RegistryPage(Gtk.Box):
 
     # -- hive discovery --
     def _scan_hives(self) -> None:
-        hives = winmod.find_hives(winmod.MOUNT_POINT) if winmod.mount_status()[0] else []
-        GLib.idle_add(self._hives_found, hives)
+        try:
+            hives = winmod.find_hives(winmod.MOUNT_POINT) if winmod.mount_status()[0] else []
+        except Exception as exc:  # noqa: BLE001 - must still reach idle_add, or this page never finishes loading
+            GLib.idle_add(self._hives_found, [], str(exc))
+            return
+        GLib.idle_add(self._hives_found, hives, None)
 
-    def _hives_found(self, hives: list) -> bool:
+    def _hives_found(self, hives: list, error: Optional[str] = None) -> bool:
+        if error:
+            self.breadcrumb.set_text(f"Could not look for registry hives: {error}")
+            return False
         self._hives = hives
         model = self.hive_picker.get_model()
         for hive in hives:

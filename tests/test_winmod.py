@@ -5,6 +5,7 @@ data (against a real hive built from hivex's own upstream test fixture), and the
 Needs python3-hivex (in the builder container): ./scripts/test-features.sh
 """
 
+import ast
 import os
 import subprocess
 import sys
@@ -232,3 +233,26 @@ def test_no_write_capable_hivex_call_exists_anywhere_in_the_module():
     source = open(os.path.join(ROOT, "installer/lintab/winmod.py")).read()
     assert "write=True" not in source and "node_set_value" not in source and "node_add_child" not in source
     assert "write=False" in source                           # the open call is explicit about it, not just the default
+
+
+def test_every_background_worker_in_the_gui_catches_its_own_exceptions():
+    """A worker that raises before calling GLib.idle_add leaves its page stuck on its initial placeholder text forever —
+    exactly the bug a real user hit (LinWinMod stuck on "Looking for Windows..."): windows_partitions() raised (disk
+    enumeration has already failed with a real DiskError in this project's own test logs), the background thread died
+    silently, and the callback that updates the label never ran. Every function that calls GLib.idle_add must wrap
+    whatever it computes beforehand in a try/except that still reaches idle_add on failure."""
+    source = open(os.path.join(ROOT, "installer/lintab/winmod_gui.py")).read()
+    tree = ast.parse(source)
+
+    def calls_idle_add(node) -> bool:
+        return any(isinstance(n, ast.Call) and getattr(n.func, "attr", "") == "idle_add" for n in ast.walk(node))
+
+    def has_try(node) -> bool:
+        return any(isinstance(n, ast.Try) for n in ast.walk(node))
+
+    checked = 0
+    for node in ast.walk(tree):
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and calls_idle_add(node):
+            assert has_try(node), f"{node.name} calls GLib.idle_add without a try/except around it"
+            checked += 1
+    assert checked >= 4   # _scan, _open's work(), _checked's work(), _scan_hives — also fails if one of them is removed

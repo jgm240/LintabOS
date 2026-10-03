@@ -259,6 +259,11 @@ read from upstream sources and other people's probes, so treat them as expected-
   built, signed and checked with `aapt`/`apksigner`. **Not tested**: Waydroid itself on this tablet, cage and Android with touch and the
   panel's orientation, whether Android can reach the listener on a real Waydroid network (a firewall could block it), and whether the
   power key reaches Android as its power button.
+- **LinWinMod bug fix (0.3.4)**: the Files and Registry pages could get stuck on their loading message forever if disk or
+  hive discovery raised an exception — a background thread dying silently before the GUI callback that updates the label
+  ever ran. A real user hit exactly this ("stuck at Looking for Windows..."). All four background workers in the window now
+  catch their own exceptions and show a message instead of hanging; a structural test (parses the module's own source)
+  checks every function that calls `GLib.idle_add` has a surrounding `try`/`except`, so this bug class can't silently return.
 - **0.3.0 features**: the safety rules and real behaviour of *Remove LintabOS* are tested on loop-device disks with real
   `sfdisk`/`ntfsresize` at 512- and 4096-byte sectors (Windows' data checksum, partitions, boot files and firmware entries all checked;
   space left alone when Windows is flagged, BitLocker-encrypted or no Windows is present); update rollback, the automatic rollback after a
