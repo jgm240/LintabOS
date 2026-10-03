@@ -55,8 +55,9 @@ class FilesPage(Gtk.Box):
 
         self.picker_group = Adw.PreferencesGroup(
             title="Examine a different partition", visible=False,
-            description="If the automatic search above didn't find your Windows drive — an unusual layout, or a "
-                        "second NTFS partition — pick any NTFS partition on this tablet by hand.")
+            description="If the automatic search above didn't find your Windows drive — an unusual layout, a "
+                        "second data partition, or one whose filesystem wasn't recognised as NTFS — pick any "
+                        "Windows-type partition on this tablet by hand.")
         picker_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8, margin_top=6, margin_bottom=6,
                             margin_start=12, margin_end=12)
         self.ntfs_picker = Gtk.DropDown(model=Gtk.StringList(), hexpand=True)
@@ -74,7 +75,7 @@ class FilesPage(Gtk.Box):
     def _scan(self) -> None:
         try:
             parts = winfiles.windows_partitions()
-            ntfs = winfiles.list_ntfs_partitions()
+            ntfs = winfiles.list_microsoft_data_partitions()
         except Exception as exc:  # noqa: BLE001 - must still reach idle_add, or the page is stuck on "Looking…" forever
             GLib.idle_add(self._scanned, None, [], str(exc))
             return

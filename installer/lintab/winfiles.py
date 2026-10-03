@@ -30,15 +30,27 @@ class WindowsPartition:
     path: str
     uuid: str
     size: int
+    fstype: str = ""     # as probed by lsblk/blkid; "" when that probe didn't resolve one. Governs the mount driver.
 
 
-def fstab_block(uuid: str, uid: int, gid: int, read_write: bool = False, mount_point: str = MOUNT_POINT) -> str:
+def mount_fstype(fstype: str) -> str:
+    """The filesystem type to hand to `mount` for a probed fstype string. Defaults to ntfs3: on a Microsoft-data-GUID
+    partition (the only kind offered here) that is overwhelmingly the realistic case even when the content probe
+    came back blank or unexpected, which does happen on an unclean or unusual NTFS volume."""
+    return "exfat" if fstype.lower() == "exfat" else "ntfs3"
+
+
+def fstab_block(uuid: str, uid: int, gid: int, read_write: bool = False, mount_point: str = MOUNT_POINT,
+                fstype: str = "") -> str:
     opts = [
-        "rw" if read_write else "ro", f"uid={uid}", f"gid={gid}", "fmask=0133", "dmask=0022", "windows_names",
+        "rw" if read_write else "ro", f"uid={uid}", f"gid={gid}", "fmask=0133", "dmask=0022",
         "nofail", "noauto", "x-systemd.automount", "x-systemd.idle-timeout=120",
         "x-gvfs-show", "x-gvfs-name=Windows", "x-gvfs-icon=drive-harddisk",
     ]
-    return f"{BEGIN}\nUUID={uuid} {mount_point} ntfs3 {','.join(opts)} 0 0\n{END}\n"
+    driver = mount_fstype(fstype)
+    if driver == "ntfs3":
+        opts.insert(5, "windows_names")   # an ntfs3-only mount option; exfat doesn't understand it
+    return f"{BEGIN}\nUUID={uuid} {mount_point} {driver} {','.join(opts)} 0 0\n{END}\n"
 
 
 def apply_block(fstab: str, block: Optional[str]) -> str:
@@ -64,10 +76,11 @@ def apply_block(fstab: str, block: Optional[str]) -> str:
 
 
 def windows_partitions() -> list[WindowsPartition]:
-    """The partition(s) that look like "the Windows install" on this computer's disks: plain (not BitLocker) NTFS,
-    and either holding a \\Windows\\System32 folder or the biggest Microsoft-data partition on a disk whose ESP has a
-    Windows boot manager (see disks.find_windows). An unusual layout — a secondary NTFS data partition, one without
-    a detectable System32 for whatever reason — won't show up here; see list_ntfs_partitions() for those."""
+    """The partition(s) that look like "the Windows install" on this computer's disks: plain (not BitLocker)
+    Microsoft data, and either holding a \\Windows\\System32 folder or the biggest Microsoft-data partition on a disk
+    whose ESP has a Windows boot manager (see disks.find_windows). An unusual layout — a secondary data partition,
+    one without a detectable System32 for whatever reason — won't show up here; see list_microsoft_data_partitions()
+    for those."""
     from . import disks
     found = []
     for disk in disks.list_disks(hide=""):
@@ -78,22 +91,27 @@ def windows_partitions() -> list[WindowsPartition]:
             continue
         uuid = disks.run(["blkid", "-s", "UUID", "-o", "value", part.path], check=False).stdout.strip()
         if uuid:
-            found.append(WindowsPartition(part.path, uuid, part.size))
+            found.append(WindowsPartition(part.path, uuid, part.size, part.fstype))
     return found
 
 
-def list_ntfs_partitions() -> list[WindowsPartition]:
-    """Every NTFS partition on every disk, not just the one(s) windows_partitions() recognises as "the Windows
-    install". For picking a partition by hand when automatic detection finds nothing. BitLocker-encrypted partitions
-    are not NTFS until unlocked, so they aren't listed; use Unlock BitLocker Drive first."""
+def list_microsoft_data_partitions() -> list[WindowsPartition]:
+    """Every partition with the Microsoft basic data GPT type on every disk, not just the one(s)
+    windows_partitions() recognises as "the Windows install". Deliberately keyed off the partition's GPT *type*,
+    not its probed filesystem content: an NTFS volume that content-probing couldn't read cleanly (unclean, unusual,
+    or just unlucky) still carries this type and is still worth examining, where fstype-based matching would miss
+    it. This is also exactly why the EFI System Partition, LintabOS's own root, and swap can never appear here: they
+    carry different GPT types, by construction, regardless of what's on them. For picking a partition by hand when
+    automatic detection finds nothing. BitLocker-encrypted partitions need the recovery key first (Unlock BitLocker
+    Drive), so they aren't listed here even though they share this same GPT type."""
     from . import disks
     found = []
     for disk in disks.list_disks(hide=""):
         for part in disk.partitions:
-            if part.fstype == "ntfs" and not disks.is_bitlocker(part):
+            if part.is_ms_data and not disks.is_bitlocker(part):
                 uuid = disks.run(["blkid", "-s", "UUID", "-o", "value", part.path], check=False).stdout.strip()
                 if uuid:
-                    found.append(WindowsPartition(part.path, uuid, part.size))
+                    found.append(WindowsPartition(part.path, uuid, part.size, part.fstype))
     return found
 
 
@@ -107,7 +125,7 @@ def add_to_fstab(fstab_path: str, uid: int, gid: int, root: str = "/", read_writ
     with open(fstab_path) as f:
         text = f.read()
     with open(fstab_path, "w") as f:
-        f.write(apply_block(text, fstab_block(part.uuid, uid, gid, read_write)))
+        f.write(apply_block(text, fstab_block(part.uuid, uid, gid, read_write, fstype=part.fstype)))
     os.makedirs(os.path.join(root, MOUNT_POINT.lstrip("/")), exist_ok=True)
     return part
 
@@ -129,7 +147,7 @@ def main(argv: Optional[list[str]] = None) -> int:
     ap.add_argument("action", choices=["status", "enable", "disable"], nargs="?", default="status")
     ap.add_argument("--user", help="who the files belong to (default: the user who ran sudo/pkexec)")
     ap.add_argument("--read-write", action="store_true", help="allow writing (refused if Windows left the drive unclean)")
-    ap.add_argument("--partition", help="use this NTFS partition (e.g. /dev/sda3) instead of picking one automatically")
+    ap.add_argument("--partition", help="use this partition (e.g. /dev/sda3) instead of picking one automatically")
     args = ap.parse_args(argv)
 
     if args.action == "status":
@@ -155,9 +173,9 @@ def main(argv: Optional[list[str]] = None) -> int:
 
     uid, gid = _owner(args.user)
     if args.partition:
-        chosen = [p for p in windows_partitions() + list_ntfs_partitions() if p.path == args.partition]
+        chosen = [p for p in windows_partitions() + list_microsoft_data_partitions() if p.path == args.partition]
         if not chosen:
-            print(f"No NTFS partition found at {args.partition}.", file=sys.stderr)
+            print(f"No Windows (Microsoft data) partition found at {args.partition}.", file=sys.stderr)
             return 2
         parts = chosen[:1]
     else:

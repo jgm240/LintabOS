@@ -134,6 +134,20 @@ def test_fstab_block_is_read_only_owned_by_the_user_and_listed_in_the_sidebar():
     assert "rw," in winfiles.fstab_block("A", 1, 1, read_write=True)
 
 
+def test_the_mount_driver_matches_the_partitions_real_filesystem():
+    assert winfiles.mount_fstype("ntfs") == "ntfs3" and winfiles.mount_fstype("NTFS") == "ntfs3"
+    assert winfiles.mount_fstype("exfat") == "exfat" and winfiles.mount_fstype("exFAT") == "exfat"
+    assert winfiles.mount_fstype("") == "ntfs3"             # an unprobed/blank fstype: ntfs3 is the realistic default
+    assert winfiles.mount_fstype("ntfs3") == "ntfs3"         # already the driver name, not the content-probe string
+
+
+def test_the_fstab_line_uses_the_right_driver_and_only_ntfs_gets_windows_names():
+    ntfs_line = winfiles.fstab_block("U", 1, 1, fstype="ntfs")
+    assert " ntfs3 " in ntfs_line and "windows_names" in ntfs_line
+    exfat_line = winfiles.fstab_block("U", 1, 1, fstype="exfat")
+    assert " exfat " in exfat_line and "windows_names" not in exfat_line    # exfat doesn't understand this option
+
+
 def test_fstab_block_is_added_replaced_and_removed_without_touching_other_lines():
     original = "UUID=root / ext4 defaults 0 1\nUUID=esp /boot/efi vfat umask=0077 0 2\n"
     once = winfiles.apply_block(original, winfiles.fstab_block("AAAA", 1000, 1000))
@@ -143,18 +157,21 @@ def test_fstab_block_is_added_replaced_and_removed_without_touching_other_lines(
     assert winfiles.apply_block(original.rstrip("\n"), winfiles.fstab_block("C", 1, 1)).startswith(original.rstrip("\n") + "\n")
 
 
-def test_list_ntfs_partitions_finds_what_automatic_detection_misses(monkeypatch):
-    """list_ntfs_partitions() exists because windows_partitions() (automatic detection) needs a \\Windows\\System32
-    folder, or to be the biggest Microsoft-data partition on a disk with a Windows boot manager — an NTFS partition
-    satisfying neither (an unusual layout, a secondary data partition) is still real and still worth examining."""
+def test_list_microsoft_data_partitions_finds_what_automatic_detection_and_fstype_matching_both_miss(monkeypatch):
+    """list_microsoft_data_partitions() is keyed off the GPT *type* (Microsoft basic data), not the probed
+    filesystem content: an unclean or unusual NTFS volume that blkid/lsblk couldn't read cleanly (fstype comes back
+    blank, or anything other than exactly "ntfs") still carries this type and is still worth examining — matching by
+    fstype alone (the previous design) would have missed exactly this case, which is why it was changed."""
     from lintab.disks import Disk, GiB, MiB, Partition
 
     windows = Partition(1, "/dev/sdz1", 0, 50 * GiB, disks.GUID_MS_BASIC_DATA, "win-uuid", name="Windows", fstype="ntfs")
-    data = Partition(2, "/dev/sdz2", 50 * GiB, 20 * GiB, disks.GUID_MS_BASIC_DATA, "data-ignored", name="Data", fstype="ntfs")
+    unprobed = Partition(2, "/dev/sdz2", 50 * GiB, 20 * GiB, disks.GUID_MS_BASIC_DATA, "data-ignored", name="Data", fstype="")
     locked = Partition(3, "/dev/sdz3", 70 * GiB, 10 * GiB, disks.GUID_MS_BASIC_DATA, "bl-uuid", name="BL", fstype="bitlocker")
     other_fs = Partition(4, "/dev/sdz4", 80 * GiB, 5 * GiB, disks.GUID_LINUX_FS, "linux-uuid", name="Linux", fstype="ext4")
+    esp = Partition(5, "/dev/sdz5", 85 * GiB, 1 * GiB, disks.GUID_ESP, "esp-uuid", name="EFI", fstype="vfat")
     disk = Disk(path="/dev/sdz", size=120 * GiB, sector_size=512, model="Test", transport="usb", removable=False,
-               label="gpt", first_usable=MiB, last_usable=120 * GiB - MiB, partitions=[windows, data, locked, other_fs])
+               label="gpt", first_usable=MiB, last_usable=120 * GiB - MiB,
+               partitions=[windows, unprobed, locked, other_fs, esp])
 
     monkeypatch.setattr(disks, "list_disks", lambda hide="": [disk])
     monkeypatch.setattr(disks, "find_windows", lambda d: windows)           # automatic detection: only the first one
@@ -164,22 +181,23 @@ def test_list_ntfs_partitions_finds_what_automatic_detection_misses(monkeypatch)
     auto = winfiles.windows_partitions()
     assert [p.path for p in auto] == ["/dev/sdz1"]                         # unchanged: still just "the" Windows partition
 
-    manual = winfiles.list_ntfs_partitions()
-    assert sorted(p.path for p in manual) == ["/dev/sdz1", "/dev/sdz2"]    # both plain NTFS partitions...
+    manual = winfiles.list_microsoft_data_partitions()
+    assert sorted(p.path for p in manual) == ["/dev/sdz1", "/dev/sdz2"]    # the unprobed one is now found too...
     assert "/dev/sdz3" not in [p.path for p in manual]                     # ...never the BitLocker one...
-    assert "/dev/sdz4" not in [p.path for p in manual]                     # ...never a non-NTFS one
+    assert "/dev/sdz4" not in [p.path for p in manual]                     # ...never a different filesystem type...
+    assert "/dev/sdz5" not in [p.path for p in manual]                     # ...never the EFI partition (different GPT type)
     data_found = next(p for p in manual if p.path == "/dev/sdz2")
-    assert data_found.uuid == "data-uuid" and data_found.size == 20 * GiB
+    assert data_found.uuid == "data-uuid" and data_found.size == 20 * GiB and data_found.fstype == ""
 
 
-def test_cli_partition_lookup_falls_back_from_auto_detected_to_any_ntfs_partition():
+def test_cli_partition_lookup_falls_back_from_auto_detected_to_any_microsoft_data_partition():
     """Mirrors exactly what `lintab-windows-files enable --partition PATH` looks up: the automatically detected
-    Windows partition(s) plus every NTFS partition, filtered to the one path asked for."""
+    Windows partition(s) plus every Microsoft-data partition, filtered to the one path asked for."""
     auto = [winfiles.WindowsPartition("/dev/sda3", "AUTO", 10)]
-    all_ntfs = [winfiles.WindowsPartition("/dev/sda3", "AUTO", 10), winfiles.WindowsPartition("/dev/sdb1", "DATA", 5)]
-    chosen = [p for p in auto + all_ntfs if p.path == "/dev/sdb1"]
+    all_ms_data = [winfiles.WindowsPartition("/dev/sda3", "AUTO", 10), winfiles.WindowsPartition("/dev/sdb1", "DATA", 5)]
+    chosen = [p for p in auto + all_ms_data if p.path == "/dev/sdb1"]
     assert len(chosen) == 1 and chosen[0].uuid == "DATA"               # found even though it's not "the" Windows partition
-    assert [p for p in auto + all_ntfs if p.path == "/dev/nonexistent"] == []
+    assert [p for p in auto + all_ms_data if p.path == "/dev/nonexistent"] == []
 
 
 def test_installer_hook_writes_the_biggest_windows_partition(tmp_path):

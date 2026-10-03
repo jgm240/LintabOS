@@ -259,6 +259,16 @@ read from upstream sources and other people's probes, so treat them as expected-
   built, signed and checked with `aapt`/`apksigner`. **Not tested**: Waydroid itself on this tablet, cage and Android with touch and the
   panel's orientation, whether Android can reach the listener on a real Waydroid network (a firewall could block it), and whether the
   power key reaches Android as its power button.
+- **LinWinMod partition picker broadened to any Microsoft-data partition (0.3.8)**: `list_ntfs_partitions()` matched by
+  *probed filesystem content* (`fstype == "ntfs"`), which misses a real Windows partition whenever that content probe
+  doesn't come back clean — which does happen. Renamed to `list_microsoft_data_partitions()` and matched by *GPT
+  partition type* instead (the same Microsoft-data GUID `windows_partitions()` already keys off), which doesn't depend
+  on content probing at all. This also makes the mount itself filesystem-aware: it was previously hardcoded to the
+  `ntfs3` driver regardless of what's actually there; it now uses `exfat` for an exFAT volume and keeps `ntfs3` as the
+  sensible default otherwise (an NTFS volume whose probe came back blank is still overwhelmingly likely to be NTFS).
+  The EFI partition, LintabOS's own root, and swap can never appear in the picker — they carry different GPT types,
+  by construction, regardless of what's on them. **BitLocker is still excluded**, and that exclusion doesn't depend on
+  the content probe either (`is_bitlocker()` reads the real boot sector directly).
 - **Touchscreen diagnostics in Hardware Report (0.3.7)**: a reported touchscreen problem has no real diagnostic yet
   (unlike Wi-Fi, fingerprint and sleep). The report now shows whether udev tags any device as a touchscreen, what
   `libinput` (what GNOME actually uses for input) sees, and the kernel's own messages about the touch controller.

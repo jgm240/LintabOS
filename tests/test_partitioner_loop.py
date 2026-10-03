@@ -277,7 +277,7 @@ def test_remove_lintabos_refuses_a_disk_without_windows(windows_disk):
 def test_a_plain_ntfs_data_partition_is_invisible_to_automatic_detection(tmp_path):
     """find_windows() (what windows_partitions() relies on) needs a \\Windows\\System32 folder, or to be the
     biggest Microsoft-data partition on a disk with a Windows boot manager on its ESP. A plain NTFS data partition
-    with neither is exactly what the manual picker (list_ntfs_partitions()) exists for."""
+    with neither is exactly what the manual picker (list_microsoft_data_partitions()) exists for."""
     img = tmp_path / "disk.img"
     with open(img, "wb") as f:
         f.truncate(4 * GiB)
