@@ -46,3 +46,7 @@ hivex-*/
 hivex_*
 payload/usr/bin/lintab-sleep-mode
 payload/usr/bin/lintab-sleep-mode-gui
+payload/usr/bin/lintab-restart-windows-gui
+payload/usr/bin/lintab-restart-windows
+payload/usr/bin/lintab-winterm
+.DS_Store

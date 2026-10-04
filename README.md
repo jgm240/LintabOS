@@ -259,6 +259,21 @@ read from upstream sources and other people's probes, so treat them as expected-
   built, signed and checked with `aapt`/`apksigner`. **Not tested**: Waydroid itself on this tablet, cage and Android with touch and the
   panel's orientation, whether Android can reach the listener on a real Waydroid network (a firewall could block it), and whether the
   power key reaches Android as its power button.
+- **Restart into Windows: Recovery and Safe Mode (0.3.9)**. The shortcut now opens a small chooser: a normal restart
+  (unchanged), **Restart into Windows Recovery**, and **Restart into Windows Safe Mode**. Recovery sets the standard
+  UEFI `OsIndications` variable's documented "start OS recovery" bit before rebooting — a real UEFI-spec mechanism,
+  confirmed safe to attempt (the same variable systemd-boot and GNOME already use for "reboot to firmware setup",
+  just a different bit), but **not independently confirmed to make Windows actually honor it** on any real hardware.
+  If it doesn't, the tablet just boots into Windows normally — the real, manual way in (Settings → Recovery →
+  Advanced startup, or holding Shift while choosing Restart) is always shown alongside it, not hidden as a silent
+  fallback. Safe Mode makes the same attempt, since it lives inside Windows' own recovery menu rather than being a
+  separate boot choice; reaching it directly would need editing Windows' Boot Configuration Data, a binary registry
+  hive LintabOS does not write to anywhere (same reasoning as LinWinMod's read-only registry browser).
+- **WinTermMod**: a terminal, positioned at your mounted Windows drive (same Fast-Startup/BitLocker checks as
+  LinWinMod), for `find`/`grep`/scripting against your Windows files directly. **It is not Windows `cmd.exe`** — a
+  native Windows program can't run outside Windows at all, and running one against your real Windows system drive
+  through a compatibility layer would be, in effect, a way to act on Windows without logging into it, the same risk
+  LinWinMod's registry browser was built to avoid. It's an ordinary Linux shell, just started in the right place.
 - **LinWinMod partition picker broadened to any Microsoft-data partition (0.3.8)**: `list_ntfs_partitions()` matched by
   *probed filesystem content* (`fstype == "ntfs"`), which misses a real Windows partition whenever that content probe
   doesn't come back clean — which does happen. Renamed to `list_microsoft_data_partitions()` and matched by *GPT

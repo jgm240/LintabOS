@@ -36,6 +36,8 @@ docker run --rm -v "$PWD:/lintab" -w /lintab lintabos-builder bash -euo pipefail
            /usr/libexec/lintab/sleep-mode-apply /usr/libexec/lintab/sleep-guard-run \
            /usr/lib/systemd/system/lintab-sleep-mode-apply.service /usr/lib/systemd/system/lintab-sleep-guard.service \
            /usr/share/polkit-1/actions/org.lintabos.sleep-mode.policy /usr/share/applications/lintab-sleep-mode.desktop \
+           /usr/bin/lintab-restart-windows /usr/bin/lintab-restart-windows-gui /usr/bin/lintab-winterm \
+           /usr/share/applications/lintab-winterm.desktop \
            /usr/share/wayland-sessions/lintab-android.desktop /usr/share/applications/lintab-android.desktop /usr/libexec/lintab/install-waydroid /usr/libexec/lintab/battery-limit \
            /usr/lib/systemd/system/lintab-battery-limit.service /usr/share/polkit-1/actions/org.lintabos.extras.policy \
            /usr/share/polkit-1/actions/org.lintabos.battery.policy /usr/share/applications/lintab-hwreport.desktop \
@@ -70,7 +72,7 @@ docker run --rm -v "$PWD:/lintab" -w /lintab lintabos-builder bash -euo pipefail
   lintab-update status
   python3 - <<PY
 import sys; sys.path.insert(0, "/usr/lib/python3/dist-packages")
-import lintab.update, lintab.update_gui, lintab.bitlocker_gui, lintab.gui, lintab.desktops, lintab.touchsetup, lintab.xfce_rotate, lintab.uninstall, lintab.uninstall_gui, lintab.hwreport, lintab.extras, lintab.comfort, lintab.battery, lintab.battery_gui, lintab.tablet_gui, lintab.wifi, lintab.android, lintab.winmod, lintab.winmod_gui, lintab.sleepmode, lintab.sleepmode_gui
+import lintab.update, lintab.update_gui, lintab.bitlocker_gui, lintab.gui, lintab.desktops, lintab.touchsetup, lintab.xfce_rotate, lintab.uninstall, lintab.uninstall_gui, lintab.hwreport, lintab.extras, lintab.comfort, lintab.battery, lintab.battery_gui, lintab.tablet_gui, lintab.wifi, lintab.android, lintab.winmod, lintab.winmod_gui, lintab.sleepmode, lintab.sleepmode_gui, lintab.winrecovery, lintab.restartwindows_gui, lintab.winterm
 print("ok   python modules import (GTK stack present)")
 PY
   echo "== upgrade $V -> $NEXT"

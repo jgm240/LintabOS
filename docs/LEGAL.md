@@ -135,6 +135,28 @@ is credential material, not configuration, regardless of read/write. The Windows
 file management on a drive already mounted read-write (the same capability `lintab-windows-files --read-write` already has);
 it does not add a new way to change Windows, only a convenient entry point to the existing one.
 
+### Why WinTermMod opens a Linux shell, not Windows cmd.exe
+
+A native Windows program cannot execute outside Windows at all (no Windows kernel, registry or services underneath
+for it to use), and running one against the real Windows system drive through a compatibility layer such as Wine
+(as opposed to a disposable Wine prefix) would, in effect, provide a way to run arbitrary Windows administrative
+tools against the system without logging into Windows — the same risk category LinWinMod's registry browser was
+built to avoid (see "LinWinMod: why the registry has no safe subset to edit", above). WinTermMod instead mounts the
+Windows drive (the same safety-checked, read-write mount LinWinMod's Files tab already uses) and opens an ordinary
+Linux terminal there.
+
+### Restart into Windows Recovery/Safe Mode: what is and isn't verified
+
+Setting the UEFI `OsIndications` variable's `EFI_OS_INDICATIONS_START_OS_RECOVERY` bit is a real, UEFI-specification
+mechanism, and writing to it is exactly as safe as the well-established "reboot to firmware setup" feature already
+used by systemd-boot and GNOME (the same variable, a different, already-confirmed bit). What is **not** verified is
+whether Windows' own boot manager acts on this particular bit on any real hardware tested here — real effort went
+into checking this (the UEFI-spec bit value itself was confirmed from spec-derived sources), but no confirmation
+either way was found for the Windows side. Reaching Safe Mode directly, skipping Windows' own recovery menu, would
+need editing Windows' Boot Configuration Data (BCD) — a binary registry hive. LintabOS does not do this: a wrong
+BCD edit can leave Windows unable to boot at all, a risk that cannot be ruled out here without a real Windows BCD
+store to test against, so the last few clicks inside Windows' own menu are the trade made instead.
+
 ## 3. The Tux logo
 
 - **Copyright:** Tux was created by Larry Ewing in 1996 with The GIMP. Per Wikipedia and a second source, he released it with

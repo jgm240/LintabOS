@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=WinTermMod
+Comment=A terminal on your Windows drive (a Linux shell, not Windows cmd.exe)
+Exec=lintab-winterm
+Icon=utilities-terminal
+Categories=System;Utility;
+Keywords=windows;terminal;cmd;shell;ntfs;

@@ -1,8 +1,8 @@
 [Desktop Entry]
 Type=Application
 Name=Restart into Windows
-Comment=Reboot and start Windows once
-Exec=pkexec /usr/libexec/lintab/reboot-windows
+Comment=Reboot into Windows, Windows Recovery, or Windows Safe Mode
+Exec=lintab-restart-windows-gui
 Icon=system-reboot-symbolic
 Categories=System;
-Keywords=windows;dualboot;reboot;
+Keywords=windows;dualboot;reboot;recovery;safe mode;winre;
