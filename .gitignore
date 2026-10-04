@@ -50,3 +50,4 @@ payload/usr/bin/lintab-restart-windows-gui
 payload/usr/bin/lintab-restart-windows
 payload/usr/bin/lintab-winterm
 .DS_Store
+.claude/settings.local.json

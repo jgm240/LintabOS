@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Windows Boot Configuration (Experimental)
+Comment=Write Windows' real Shift+Restart flag, with automatic backup and verification
+Exec=lintab-bcd-write-gui
+Icon=dialog-warning-symbolic
+Categories=System;
+Keywords=windows;bcd;boot;recovery;troubleshoot;experimental;

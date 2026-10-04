@@ -152,10 +152,27 @@ mechanism, and writing to it is exactly as safe as the well-established "reboot 
 used by systemd-boot and GNOME (the same variable, a different, already-confirmed bit). **Tested on a real Duet 3 (0.3.10): Windows' own boot manager does not open the Troubleshoot/Advanced Options
 menu in response to this bit.** What it does instead is trigger Windows' own Startup Repair check, a different,
 narrower mechanism, kept because it is a real and harmless effect rather than a silent no-op. Reaching Safe Mode
-directly, skipping Windows' own recovery menu, would
-need editing Windows' Boot Configuration Data (BCD) — a binary registry hive. LintabOS does not do this: a wrong
-BCD edit can leave Windows unable to boot at all, a risk that cannot be ruled out here without a real Windows BCD
-store to test against, so the last few clicks inside Windows' own menu are the trade made instead.
+directly, skipping Windows' own recovery menu, needs editing Windows' Boot Configuration Data (BCD) — a binary
+registry hive. See "Windows Boot Configuration (Experimental): the one write LintabOS makes", below, for why 0.3.11
+adds exactly that write, and only behind a real safety net.
+
+### Windows Boot Configuration (Experimental): the one write LintabOS makes
+
+Every other Windows-facing tool in LintabOS is deliberately read-only or file-level-only (see "LinWinMod: why the
+registry has no safe subset to edit", above). This is the one exception, added in 0.3.11, and it exists because
+the alternative — Shift+Restart / `shutdown /r /o` inside Windows itself — writes to exactly the same BCD element
+(`onetimeadvancedoptions`) that this tool writes; LintabOS is not introducing a new kind of risk to the system,
+only offering the same flag from outside Windows. The risk that remains is a bad write leaving Windows unable to
+boot, which a blocklist-style "safe subset" cannot rule out any more than it could for the general registry (see
+above) — so instead of trying to carve out a safe subset, the write itself is wrapped in a safety net that assumes
+it could fail, every time it runs: refuses without AC power and at least 40% battery (the ESP is FAT32, not
+journaled, and a write torn by power loss can corrupt more than the one file); always backs up the live BCD first;
+re-opens and verifies the result in a fresh hivex handle rather than trusting that the write call not raising means
+it worked; and automatically restores the backup the moment that verification fails, for any reason, before
+control ever returns to the user. It ships as a separate, clearly-labeled "(Experimental)" tool rather than
+replacing the Recovery button, because the write path was validated during development against real BCD samples
+but not yet confirmed to produce the intended result (opening the Troubleshoot menu) on a real, already-installed
+Windows system — see `installer/lintab/bcdbackup.py` and `docs/releases/0.3.11.md`.
 
 ## 3. The Tux logo
 

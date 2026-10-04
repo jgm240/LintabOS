@@ -270,8 +270,23 @@ read from upstream sources and other people's probes, so treat them as expected-
   → Recovery → Advanced startup, or holding Shift while choosing Restart *from within Windows* — a Windows feature,
   unrelated to this UEFI variable) is shown alongside it every time, not as a fallback for a silent failure. Safe
   Mode makes the same attempt, since it lives inside Windows' own recovery menu rather than being a separate boot
-  choice; reaching it directly would need editing Windows' Boot Configuration Data, a binary registry hive LintabOS
-  does not write to anywhere (same reasoning as LinWinMod's read-only registry browser).
+  choice; reaching it directly needs editing Windows' Boot Configuration Data, a binary registry hive — see
+  **"Windows Boot Configuration (Experimental)" (0.3.11)** below for the one place LintabOS now does exactly that,
+  and the safety net around it.
+- **Windows Boot Configuration (Experimental) (0.3.11)**: the one write LintabOS makes to the Windows registry,
+  added specifically because Shift+Restart / `shutdown /r /o` *inside* Windows already writes to this exact same
+  BCD element (`onetimeadvancedoptions`) — this just offers the same flag from outside Windows, with a real safety
+  net every time it runs: refuses without AC power and at least 40% battery (the write is too fast, milliseconds,
+  to meaningfully catch a power-unplug event mid-write and abort it, and a torn write to the non-journaled FAT32
+  ESP can corrupt more than one file); always backs up the live BCD first; re-opens and verifies the result in a
+  *fresh* hivex handle rather than trusting that the write call not raising means it worked; and automatically
+  restores the backup the instant that verification fails, for any reason. A separate "Restore backed-up BCD"
+  action works independent of any write attempt too. Ships as its own clearly-labeled "(Experimental)" tool, not
+  folded into the existing Recovery button: the write path was validated during development against real BCD
+  samples (the actual test fixture in this repo is synthetic — `tests/fixtures/synthetic-bcd-sample/`, built from
+  hivex's own upstream test hive plus invented data, not extracted from any real Windows install) but not yet
+  confirmed to open the Troubleshoot menu on a real, already-installed Windows system. See `docs/LEGAL.md` and
+  `docs/releases/0.3.11.md`.
 - **WinTermMod**: a terminal, positioned at your mounted Windows drive (same Fast-Startup/BitLocker checks as
   LinWinMod), for `find`/`grep`/scripting against your Windows files directly. **It is not Windows `cmd.exe`** — a
   native Windows program can't run outside Windows at all, and running one against your real Windows system drive
