@@ -71,3 +71,39 @@ def test_windows_partitions_reads_the_uuid_through_the_same_path_safe_run():
     source = open(os.path.join(os.path.dirname(__file__), "..", "installer/lintab/winfiles.py")).read()
     assert 'subprocess.run(["blkid"' not in source
     assert 'disks.run(["blkid"' in source
+
+
+# ------------------------------------------------------------------- ESP mount reuse (real Duet 3 bug) --
+# Found live: the ESP is always already mounted at /boot/efi on any real *installed* LintabOS system (its own
+# GRUB lives there too, on the same shared ESP as Windows). esp_has_windows()/esp_free_bytes() used to always try
+# a fresh mount regardless, which the kernel refuses ("Can't mount, would change RO state") - so they silently
+# returned "no Windows here" / 0 bytes free on every real install, never because anything was actually wrong.
+
+def _fake_esp(path="/dev/fake-esp1"):
+    class Esp:
+        pass
+    e = Esp()
+    e.path = path
+    return e
+
+
+def test_mount_point_of_finds_an_existing_mount(tmp_path):
+    proc_mounts = tmp_path / "mounts"
+    proc_mounts.write_text("/dev/nvme0n1p1 /boot/efi vfat rw,relatime 0 0\n/dev/nvme0n1p5 / ext4 rw 0 0\n")
+    assert disks.mount_point_of("/dev/nvme0n1p1", str(proc_mounts)) == "/boot/efi"
+    assert disks.mount_point_of("/dev/nowhere", str(proc_mounts)) is None
+
+
+def test_esp_has_windows_reuses_an_already_mounted_esp_instead_of_remounting(monkeypatch, tmp_path):
+    already_mounted = tmp_path / "boot-efi"
+    (already_mounted / "EFI" / "Microsoft" / "Boot").mkdir(parents=True)
+    (already_mounted / "EFI" / "Microsoft" / "Boot" / "bootmgfw.efi").write_bytes(b"fake")
+
+    monkeypatch.setattr(disks, "mount_point_of",
+                        lambda device, proc_mounts="/proc/mounts": str(already_mounted) if device == "/dev/fake-esp1" else None)
+
+    mount_calls = []
+    monkeypatch.setattr(disks, "run", lambda argv, **k: mount_calls.append(argv))
+
+    assert disks.esp_has_windows(_fake_esp()) is True
+    assert mount_calls == []          # never attempted to mount or unmount an already-mounted ESP

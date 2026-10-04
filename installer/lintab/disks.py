@@ -297,32 +297,38 @@ def _has_windows_dir(part: Partition) -> bool:
             pass
 
 
-def esp_free_bytes(esp: Partition) -> int:
-    import tempfile
-    mnt = tempfile.mkdtemp(prefix="lintab-esp-")
+def mount_point_of(device_path: str, proc_mounts: str = "/proc/mounts") -> Optional[str]:
+    """Where device_path is already mounted, if anywhere. On any real *installed* LintabOS system the ESP is
+    always already mounted at /boot/efi (LintabOS's own GRUB lives there too, on the same shared ESP as
+    Windows) - mounting it again at a fresh temp path then fails outright, since the kernel refuses a second
+    mount of the same block device with a different ro/rw state ("Can't mount, would change RO state"). Found on
+    a real Duet 3: esp_has_windows() was silently returning False for exactly this reason on every already
+    installed system, not because anything was actually wrong with the ESP."""
     try:
-        run(["mount", "-o", "ro", esp.path, mnt])
-        try:
-            st = os.statvfs(mnt)
-            return st.f_bavail * st.f_frsize
-        finally:
-            run(["umount", mnt], check=False)
-    finally:
-        try:
-            os.rmdir(mnt)
-        except OSError:
-            pass
+        with open(proc_mounts) as f:
+            for line in f:
+                fields = line.split()
+                if len(fields) >= 2 and fields[0] == device_path:
+                    return fields[1]
+    except OSError:
+        pass
+    return None
 
 
-def esp_has_windows(esp: Partition) -> bool:
+def _with_esp_mounted(esp: "Partition", body):
+    """Run body(mount_point) against esp, reusing an existing mount (see mount_point_of) if there is one rather
+    than risk the doomed second-mount attempt; only mounts (read-only) and unmounts itself when the ESP genuinely
+    isn't mounted anywhere yet."""
     import tempfile
+    existing = mount_point_of(esp.path)
+    if existing is not None:
+        return body(existing)
     mnt = tempfile.mkdtemp(prefix="lintab-esp-")
     try:
         if run(["mount", "-o", "ro", esp.path, mnt], check=False).returncode != 0:
-            return False
+            return None
         try:
-            return any(os.path.isfile(os.path.join(mnt, "EFI", "Microsoft", "Boot", name))
-                       for name in ("bootmgfw.efi", "BOOTMGFW.EFI"))
+            return body(mnt)
         finally:
             run(["umount", mnt], check=False)
     finally:
@@ -330,3 +336,17 @@ def esp_has_windows(esp: Partition) -> bool:
             os.rmdir(mnt)
         except OSError:
             pass
+
+
+def esp_free_bytes(esp: Partition) -> int:
+    def body(mnt):
+        st = os.statvfs(mnt)
+        return st.f_bavail * st.f_frsize
+    return _with_esp_mounted(esp, body) or 0
+
+
+def esp_has_windows(esp: Partition) -> bool:
+    def body(mnt):
+        return any(os.path.isfile(os.path.join(mnt, "EFI", "Microsoft", "Boot", name))
+                   for name in ("bootmgfw.efi", "BOOTMGFW.EFI"))
+    return bool(_with_esp_mounted(esp, body))

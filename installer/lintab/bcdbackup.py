@@ -138,8 +138,11 @@ RECOVERY_SEQUENCE_ELEMENT = "14000008"                     # BcdLibraryObjectLis
 # lists every element on the entry by its raw hex ID instead of guessing, so it's visible either way.
 
 # A few other well-known element IDs, purely to make describe_default_entry's output readable - not acted on.
+# DEFAULT_OBJECT_ELEMENT is deliberately NOT listed here: that friendly name is only correct as an element of
+# {bootmgr} itself. describe_default_entry lists the elements of the *resolved* default OS entry, a different
+# object, where the same numeric ID "23000003" means something else, not yet confirmed (found live on a real
+# Duet 3: a real OS loader entry does carry its own distinct "23000003" element).
 _KNOWN_ELEMENT_NAMES = {
-    DEFAULT_OBJECT_ELEMENT: "default object (BcdBootMgrObject_DefaultObject)",
     ONETIME_ADVANCED_OPTIONS_ELEMENT: "onetimeadvancedoptions",
     "260000c4": "onetimeoptionsedit",
     RECOVERY_SEQUENCE_ELEMENT: "recoverysequence",
@@ -297,17 +300,30 @@ def find_windows_esp(run=subprocess.run):
 
 
 class MountedEsp:
-    """Context manager: mounts an ESP for the duration of the ``with`` block (read-write by default, or
-    read-only with ``read_only=True`` - used for inspection that should never risk writing anything), always
-    unmounts after, even if the block raises."""
+    """Context manager: gives access to an ESP's contents for the duration of the ``with`` block.
 
-    def __init__(self, esp_path: str, run=subprocess.run, read_only: bool = False):
+    If the ESP is already mounted somewhere (checked via /proc/mounts - true on a real Duet 3, where it's always
+    already mounted at /boot/efi for LintabOS's own GRUB), that existing mount point is reused as-is, and never
+    unmounted afterwards - it isn't ours to take away from the rest of the system. Only when the ESP genuinely
+    isn't mounted anywhere does this mount it itself (read-write by default, or read-only with
+    ``read_only=True`` - for inspection that should never risk writing anything), and only then does it unmount
+    on exit."""
+
+    def __init__(self, esp_path: str, run=subprocess.run, read_only: bool = False, proc_mounts: str = "/proc/mounts"):
         self.esp_path = esp_path
         self.run = run
         self.read_only = read_only
+        self.proc_mounts = proc_mounts
         self.mount_point: Optional[str] = None
+        self._borrowed = False
 
     def __enter__(self) -> str:
+        from . import disks
+        existing = disks.mount_point_of(self.esp_path, self.proc_mounts)
+        if existing is not None:
+            self._borrowed = True
+            self.mount_point = existing
+            return self.mount_point
         self.mount_point = tempfile.mkdtemp(prefix="lintab-bcd-")
         argv = ["mount"] + (["-o", "ro"] if self.read_only else []) + [self.esp_path, self.mount_point]
         proc = self.run(argv, capture_output=True, text=True)
@@ -317,6 +333,8 @@ class MountedEsp:
         return self.mount_point
 
     def __exit__(self, *exc) -> None:
+        if self._borrowed:
+            return    # not ours to unmount - the rest of the system (GRUB, future updates) still needs it
         self.run(["umount", self.mount_point], capture_output=True, text=True)
         try:
             os.rmdir(self.mount_point)

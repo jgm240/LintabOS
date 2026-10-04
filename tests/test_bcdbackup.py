@@ -389,6 +389,22 @@ def test_the_gui_shows_the_experimental_warning():
     assert "experimental" in source.lower() and "not yet" in source.lower()
 
 
+def test_mounted_esp_reuses_an_existing_mount_and_never_unmounts_it(monkeypatch, tmp_path):
+    """The real Duet 3 bug: the ESP is always already mounted at /boot/efi for LintabOS's own GRUB. Mounting it
+    again fails outright, and - just as importantly - even if it didn't, unmounting it afterwards would pull the
+    ESP out from under the rest of the running system. Neither should ever be attempted when it's already there."""
+    already_mounted = tmp_path / "boot-efi"
+    already_mounted.mkdir()
+    from lintab import disks
+    monkeypatch.setattr(disks, "mount_point_of", lambda device, proc_mounts="/proc/mounts": str(already_mounted))
+
+    calls = []
+    fake_run = lambda argv, **k: calls.append(argv)  # noqa: E731
+    with bcdbackup.MountedEsp("/dev/fake-esp1", run=fake_run) as mount_point:
+        assert mount_point == str(already_mounted)
+    assert calls == []            # no mount, and critically no umount, of something we don't own
+
+
 def test_the_gui_offers_the_read_only_describe_action_too():
     source = open(os.path.join(ROOT, "installer/lintab/bcdwrite_gui.py")).read()
     assert '"describe"' in source and "Read-only" in source
