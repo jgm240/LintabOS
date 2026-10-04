@@ -273,6 +273,15 @@ read from upstream sources and other people's probes, so treat them as expected-
   choice; reaching it directly needs editing Windows' Boot Configuration Data, a binary registry hive — see
   **"Windows Boot Configuration (Experimental)" (0.3.11)** below for the one place LintabOS now does exactly that,
   and the safety net around it.
+- **Windows Boot Configuration bug fix + read-only inspection (0.3.12)**: within hours of 0.3.11 shipping, a real
+  Duet 3 test found the power gate refusing to write because it read a connected stylus/keyboard case's own HID
+  battery (reporting 0%) instead of the tablet's real battery (`BATX`, 72% and charging) - the tablet exposes two
+  "Battery"-typed `/sys/class/power_supply/` entries, and the code took whichever came first. Fixed by skipping
+  any supply named with the Linux kernel's own `hid-<id>-battery-N` convention, a real general fix rather than a
+  one-off. Also adds a third, **read-only** action, "Describe current boot entry": lists every element on the
+  default Windows boot entry (friendly names for `onetimeadvancedoptions`, `recoverysequence`, ...) without
+  touching Windows, `bcdedit`, or writing anything - so whether a real install's recovery is actually wired up can
+  be checked from LintabOS alone.
 - **Windows Boot Configuration (Experimental) (0.3.11)**: the one write LintabOS makes to the Windows registry,
   added specifically because Shift+Restart / `shutdown /r /o` *inside* Windows already writes to this exact same
   BCD element (`onetimeadvancedoptions`) — this just offers the same flag from outside Windows, with a real safety

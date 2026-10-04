@@ -4,13 +4,17 @@ the flag ``shutdown /r /o`` / Shift+Restart sets, which is what actually opens W
 options menu (unlike the UEFI ``OsIndications`` bit in :mod:`lintab.winrecovery`, which real-hardware testing
 showed only triggers an Automatic Repair check, not that menu).
 
-**Status: experimental, not yet confirmed on a real installed Windows system.** The write path itself (hivex
-``node_add_child``/``node_set_value``/``commit``) was verified, round-tripped through a second, independent tool
-(``hivexsh``), against real Microsoft-authored BCD samples extracted from a Windows installation ISO - see
-``tests/fixtures/real-bcd-samples/``. What has *not* yet been confirmed is that writing this on an *installed*
-system's live BCD, then rebooting, actually opens the Troubleshoot menu on real hardware, or that this handles
-whatever structural differences a real installed-system BCD may have from the setup-media samples it was
-validated against (more boot entries, prior edits, a different Windows version).
+**Status: experimental.** The write path itself (hivex ``node_add_child``/``node_set_value``/``commit``) was
+verified, round-tripped through a second, independent tool (``hivexsh``), against real Microsoft-authored BCD
+samples extracted from a Windows installation ISO during development (the fixture shipped in this repo,
+``tests/fixtures/synthetic-bcd-sample/``, is a synthetic stand-in - see ``scripts/gen-synthetic-bcd-fixture.py`` -
+so nothing Microsoft-copyrighted ships here). **Real-hardware result (first report):** the write succeeds and
+verifies, but the next boot still goes straight into Windows rather than the Troubleshoot/Advanced options menu -
+on a tablet where Shift+Restart *does* reach that menu normally. The leading theory: a healthy Windows boot entry
+normally also carries ``recoveryenabled`` and ``recoverysequence`` elements (pointing at the actual WinRE loader
+object) alongside ``onetimeadvancedoptions``, and this module does not check either - if recovery isn't actually
+wired up on the live entry, the flag we write can be set and verified correctly while still having no real effect.
+``describe_default_entry`` (below) exists to check this without needing Windows at all.
 
 Because of that gap, this never runs unattended and never replaces the existing, confirmed-safe "Restart into
 Windows Recovery" feature - it is a separate, clearly-labeled experimental tool, gated behind real safety checks
@@ -64,6 +68,15 @@ def _read_int(path: str) -> Optional[int]:
         return None
 
 
+def _is_peripheral_supply(name: str) -> bool:
+    """True for a power supply that belongs to a connected peripheral (a Bluetooth/USB stylus, keyboard, mouse...)
+    rather than the device itself. The Linux kernel's own HID battery driver names these ``hid-<bus>:<vendor>:
+    <product>...-battery-N`` - a real, documented naming convention, not a guess specific to one tablet. Found by
+    testing on a real Duet 3: it has a stylus/keyboard-case battery reporting 0% that was shadowing the real
+    system battery (``BATX``, 72%) whenever directory listing order put the HID node first."""
+    return name.lower().startswith("hid-")
+
+
 def ac_connected(power_supply_dir: str = POWER_SUPPLY_DIR, listdir=os.listdir) -> Optional[bool]:
     """True/False once a Mains or USB power supply is found and its ``online`` file read. None if no such supply
     exists at all (can't tell either way) - callers must treat that the same as "not connected", never as "fine"."""
@@ -73,6 +86,8 @@ def ac_connected(power_supply_dir: str = POWER_SUPPLY_DIR, listdir=os.listdir) -
         return None
     found = False
     for name in names:
+        if _is_peripheral_supply(name):
+            continue
         if _read_text(os.path.join(power_supply_dir, name, "type")) in _AC_SUPPLY_TYPES:
             found = True
             if _read_int(os.path.join(power_supply_dir, name, "online")) == 1:
@@ -81,11 +96,16 @@ def ac_connected(power_supply_dir: str = POWER_SUPPLY_DIR, listdir=os.listdir) -
 
 
 def battery_percent(power_supply_dir: str = POWER_SUPPLY_DIR, listdir=os.listdir) -> Optional[int]:
+    """The device's own battery level - never a connected peripheral's. See _is_peripheral_supply: a real Duet 3
+    has a second "Battery"-typed node for a stylus/keyboard case, which a naive first-match would pick up instead
+    of the tablet's actual battery (BATX)."""
     try:
         names = listdir(power_supply_dir)
     except OSError:
         return None
     for name in names:
+        if _is_peripheral_supply(name):
+            continue
         if _read_text(os.path.join(power_supply_dir, name, "type")) == "Battery":
             return _read_int(os.path.join(power_supply_dir, name, "capacity"))
     return None
@@ -107,12 +127,26 @@ def power_safe_to_write(power_supply_dir: str = POWER_SUPPLY_DIR, min_battery: i
 
 
 # --------------------------------------------------------------------------------------------- BCD hive logic --
-# Pure functions over a local file path - no mounting involved, so these are directly testable against the real
-# BCD samples in tests/fixtures/real-bcd-samples/.
+# Pure functions over a local file path - no mounting involved, so these are directly testable against the
+# synthetic BCD-shaped fixture in tests/fixtures/synthetic-bcd-sample/.
 
 BOOTMGR_GUID = "{9dea862c-5cdd-4e70-acc1-f32b344d4795}"   # {bootmgr}: constant across every real Windows install
 DEFAULT_OBJECT_ELEMENT = "23000003"                       # BcdBootMgrObject_DefaultObject
 ONETIME_ADVANCED_OPTIONS_ELEMENT = "260000c3"              # what shutdown /r /o actually sets
+RECOVERY_SEQUENCE_ELEMENT = "14000008"                     # BcdLibraryObjectList_RecoverySequence
+# "recoveryenabled"'s own element ID is not pinned here (not independently confirmed) - describe_default_entry
+# lists every element on the entry by its raw hex ID instead of guessing, so it's visible either way.
+
+# A few other well-known element IDs, purely to make describe_default_entry's output readable - not acted on.
+_KNOWN_ELEMENT_NAMES = {
+    DEFAULT_OBJECT_ELEMENT: "default object (BcdBootMgrObject_DefaultObject)",
+    ONETIME_ADVANCED_OPTIONS_ELEMENT: "onetimeadvancedoptions",
+    "260000c4": "onetimeoptionsedit",
+    RECOVERY_SEQUENCE_ELEMENT: "recoverysequence",
+    "12000004": "description",
+    "11000001": "device",
+    "12000002": "path",
+}
 
 
 class BcdStructureError(RuntimeError):
@@ -200,6 +234,50 @@ def verify_onetime_advanced_options(hive_path: str, expected: bool = True) -> bo
         return False
 
 
+def _describe_value(h, value) -> str:
+    type_code = h.value_type(value)[0]
+    data = h.value_value(value)[1]
+    try:
+        if type_code in (1, 2):                    # REG_SZ, REG_EXPAND_SZ
+            return f"string: {h.value_string(value)!r}"
+        if type_code == 3 and len(data) == 1:       # REG_BINARY, single byte - BCD's own boolean encoding
+            return f"boolean: {'true' if data[0] else 'false'} (0x{data[0]:02x})"
+        if type_code == 3:
+            return f"binary ({len(data)} bytes): {data[:32].hex()}" + (" ..." if len(data) > 32 else "")
+        if type_code == 7:                          # REG_MULTI_SZ - how a GUID list (e.g. recoverysequence) is stored
+            return f"string list: {h.value_multiple_strings(value)!r}"
+    except Exception as exc:  # noqa: BLE001 - an odd/corrupt value must still be listed, not crash the description
+        return f"(could not decode: {exc})"
+    return f"type {type_code} ({len(data)} bytes): {data[:32].hex()}" + (" ..." if len(data) > 32 else "")
+
+
+@dataclass
+class BcdElementInfo:
+    element_id: str
+    friendly_name: str
+    value: str
+
+
+def describe_default_entry(hive_path: str) -> list[BcdElementInfo]:
+    """Every element on the *default* OS entry, read-only, with a friendly name where one is known - so a real
+    boot entry can be inspected (e.g. is ``recoveryenabled``/``recoverysequence`` actually present and healthy?)
+    without needing Windows or bcdedit at all. Raises BcdStructureError the same way set_onetime_advanced_options
+    does if the structure isn't what's expected; never guesses."""
+    import hivex
+    h = hivex.Hivex(hive_path, write=False)
+    guid = _default_object_guid(h)
+    if guid is None:
+        raise BcdStructureError("could not resolve {bootmgr}'s default boot entry (BcdBootMgrObject_DefaultObject)")
+    elements = _target_elements_node(h, guid)
+    out = []
+    for child in sorted(h.node_children(elements), key=h.node_name):
+        element_id = h.node_name(child)
+        value = _find_value(h, child, "Element")
+        display = _describe_value(h, value) if value is not None else "(no Element value)"
+        out.append(BcdElementInfo(element_id, _KNOWN_ELEMENT_NAMES.get(element_id, "(unknown)"), display))
+    return out
+
+
 # ------------------------------------------------------------------------------------- finding and mounting the ESP --
 
 BCD_SUBPATH = os.path.join("EFI", "Microsoft", "Boot", "BCD")
@@ -219,17 +297,20 @@ def find_windows_esp(run=subprocess.run):
 
 
 class MountedEsp:
-    """Context manager: mounts an ESP read-write for the duration of the ``with`` block, always unmounts after -
-    even if the block raises."""
+    """Context manager: mounts an ESP for the duration of the ``with`` block (read-write by default, or
+    read-only with ``read_only=True`` - used for inspection that should never risk writing anything), always
+    unmounts after, even if the block raises."""
 
-    def __init__(self, esp_path: str, run=subprocess.run):
+    def __init__(self, esp_path: str, run=subprocess.run, read_only: bool = False):
         self.esp_path = esp_path
         self.run = run
+        self.read_only = read_only
         self.mount_point: Optional[str] = None
 
     def __enter__(self) -> str:
         self.mount_point = tempfile.mkdtemp(prefix="lintab-bcd-")
-        proc = self.run(["mount", self.esp_path, self.mount_point], capture_output=True, text=True)
+        argv = ["mount"] + (["-o", "ro"] if self.read_only else []) + [self.esp_path, self.mount_point]
+        proc = self.run(argv, capture_output=True, text=True)
         if proc.returncode != 0:
             os.rmdir(self.mount_point)
             raise OSError(f"could not mount {self.esp_path}: {(proc.stderr or proc.stdout).strip()}")
@@ -307,6 +388,28 @@ def write_onetime_advanced_options_safely(run=subprocess.run, power_supply_dir: 
         return WriteResult(False, str(exc))
 
 
+def describe_live_boot_entry(run=subprocess.run) -> WriteResult:
+    """Read-only: mount the Windows ESP read-only and describe the default OS entry's elements - whether
+    ``recoverysequence`` and anything that looks like ``recoveryenabled`` are actually present, without touching
+    Windows, bcdedit, or writing anything at all. The result's ``message`` is the formatted listing."""
+    esp = find_windows_esp(run)
+    if esp is None:
+        return WriteResult(False, "No Windows boot manager found on any disk's EFI System Partition.")
+    try:
+        with MountedEsp(esp.path, run, read_only=True) as mount_point:
+            bcd_path = os.path.join(mount_point, BCD_SUBPATH)
+            if not os.path.isfile(bcd_path):
+                return WriteResult(False, f"No BCD file at {BCD_SUBPATH} on the Windows ESP.")
+            try:
+                entries = describe_default_entry(bcd_path)
+            except BcdStructureError as exc:
+                return WriteResult(False, f"Could not read the default boot entry: {exc}")
+            lines = [f"{e.element_id}  {e.friendly_name}: {e.value}" for e in entries]
+            return WriteResult(True, "\n".join(lines) if lines else "(no elements found)")
+    except OSError as exc:
+        return WriteResult(False, str(exc))
+
+
 def restore_backup_now(run=subprocess.run, backup_path: str = BACKUP_PATH) -> WriteResult:
     """Manually restore the backed-up BCD, independent of any write attempt - the tool to reach for if something
     looks wrong after a write, or just to undo it."""
@@ -326,17 +429,26 @@ def restore_backup_now(run=subprocess.run, backup_path: str = BACKUP_PATH) -> Wr
 # --------------------------------------------------------------------------------------- privileged helper + CLI --
 
 HELPER = "/usr/libexec/lintab/bcd-write"
-MODES = ("write", "restore")
+MODES = ("write", "restore", "describe")
+# Looked up by name (via globals()) rather than captured directly, so monkeypatching e.g.
+# bcdbackup.describe_live_boot_entry in a test is seen here too, instead of the function object this held at
+# import time.
+_ACTION_NAMES = {
+    "write": "write_onetime_advanced_options_safely",
+    "restore": "restore_backup_now",
+    "describe": "describe_live_boot_entry",
+}
 
 
 def helper_main(argv: list[str], run=subprocess.run, geteuid=os.geteuid) -> int:
     if geteuid() != 0:
         print("must run as root", file=sys.stderr)
         return 1
-    if argv not in (["write"], ["restore"]):
+    if len(argv) != 1 or argv[0] not in _ACTION_NAMES:
         print(f"usage: bcd-write {'|'.join(MODES)}", file=sys.stderr)
         return 2
-    result = write_onetime_advanced_options_safely(run) if argv[0] == "write" else restore_backup_now(run)
+    action = globals()[_ACTION_NAMES[argv[0]]]
+    result = action(run)
     print(result.message)
     return 0 if result.ok else 3
 

@@ -28,7 +28,7 @@ WARNING = ("Experimental. This has been verified to produce a structurally valid
 class BcdWriteWindow(Adw.ApplicationWindow):
     def __init__(self, app: Adw.Application) -> None:
         super().__init__(application=app, title="Windows Boot Configuration (Experimental)",
-                         default_width=560, default_height=420)
+                         default_width=560, default_height=560)
         view = Adw.ToolbarView()
         view.add_top_bar(Adw.HeaderBar())
         self.set_content(view)
@@ -57,6 +57,16 @@ class BcdWriteWindow(Adw.ApplicationWindow):
         restore_row.add_suffix(Gtk.Image(icon_name="go-next-symbolic"))
         restore_row.connect("activated", lambda _r: self._run("restore"))
         group.add(restore_row)
+
+        describe_row = Adw.ActionRow(
+            title="Describe current boot entry",
+            subtitle="Read-only - lists every element on the default boot entry (e.g. whether "
+                     "onetimeadvancedoptions, recoverysequence, or anything recovery-related is actually there), "
+                     "without touching Windows or writing anything.",
+            activatable=True)
+        describe_row.add_suffix(Gtk.Image(icon_name="go-next-symbolic"))
+        describe_row.connect("activated", lambda _r: self._run("describe"))
+        group.add(describe_row)
         box.append(group)
 
         self.status = Gtk.Label(label="", wrap=True, xalign=0, css_classes=["dim-label"])
@@ -64,7 +74,13 @@ class BcdWriteWindow(Adw.ApplicationWindow):
         self.spinner = Gtk.Spinner()
         box.append(self.spinner)
 
-        self._buttons = (write_row, restore_row)
+        scroller = Gtk.ScrolledWindow(vexpand=True, has_frame=True)
+        self.output = Gtk.TextView(editable=False, cursor_visible=False, monospace=True,
+                                   top_margin=8, bottom_margin=8, left_margin=8, right_margin=8)
+        scroller.set_child(self.output)
+        box.append(scroller)
+
+        self._buttons = (write_row, restore_row, describe_row)
 
     def _run(self, mode: str) -> None:
         for row in self._buttons:
@@ -86,7 +102,8 @@ class BcdWriteWindow(Adw.ApplicationWindow):
         self.spinner.stop()
         for row in self._buttons:
             row.set_sensitive(True)
-        self.status.set_text(message or ("Done." if returncode == 0 else f"Failed (exit {returncode})."))
+        self.status.set_text("Done." if returncode == 0 else f"Failed (exit {returncode}).")
+        self.output.get_buffer().set_text(message)
         return False
 
 

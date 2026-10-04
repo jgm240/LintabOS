@@ -74,6 +74,23 @@ def test_usb_c_charging_counts_as_a_charger_not_just_mains(tmp_path):
     assert bcdbackup.ac_connected(str(tmp_path)) is True
 
 
+def test_a_hid_peripheral_battery_does_not_shadow_the_real_system_battery(tmp_path):
+    """Found on a real Duet 3: a connected stylus/keyboard case registers its own "Battery"-typed power supply
+    (hid-0018:4858:121A.0001-battery-2, capacity 0) alongside the tablet's real battery (BATX, capacity 72) - and
+    whichever one the directory listing returns first was being treated as *the* battery, sometimes reporting the
+    tablet as 0% charged when it was actually at 72% and charging."""
+    _write_supply(tmp_path, "hid-0018:4858:121A.0001-battery-2", "Battery", capacity=0, present=1)
+    _write_supply(tmp_path, "BATX", "Battery", capacity=72, present=1)
+    assert bcdbackup.battery_percent(str(tmp_path)) == 72
+
+
+def test_the_hid_filter_is_a_name_prefix_not_a_substring_match(tmp_path):
+    """Only a real hid-<id>-battery-N name is skipped - a battery that merely contains "hid" somewhere in an
+    unrelated name must still be read normally, so this can never grow into skipping real batteries by accident."""
+    _write_supply(tmp_path, "orchid-BAT0", "Battery", capacity=55, present=1)
+    assert bcdbackup.battery_percent(str(tmp_path)) == 55
+
+
 def test_no_battery_reported_at_all_does_not_block_a_connected_charger(tmp_path):
     """Some devices report no Battery node at all while genuinely plugged in - absence of a reading must not be
     treated as "below the minimum"."""
@@ -133,6 +150,29 @@ def test_writing_does_not_disturb_the_original_sibling_elements(tmp_path):
     elements_after = {after.node_name(c) for c in after.node_children(bcdbackup._target_elements_node(after, guid))}
     assert elements_before <= elements_after                      # nothing original was lost
     assert bcdbackup.ONETIME_ADVANCED_OPTIONS_ELEMENT in elements_after    # the new one is there
+
+
+@needs_hivex
+def test_describe_lists_the_pre_existing_elements_with_friendly_names_where_known(tmp_path):
+    entries = bcdbackup.describe_default_entry(FIXTURE)
+    by_id = {e.element_id: e for e in entries}
+    assert by_id["12000004"].friendly_name == "description"
+    assert "Fake synthetic description" in by_id["12000004"].value
+    assert by_id["16000060"].friendly_name == "(unknown)"            # not every element needs a name to be listed
+    assert "false" in by_id["16000060"].value
+
+
+@needs_hivex
+def test_describe_picks_up_onetimeadvancedoptions_after_a_write(tmp_path):
+    """The exact diagnostic this was built for: can you tell, read-only, whether the flag we write is actually
+    there - and that it's recognised with its friendly name once it exists."""
+    copy = tmp_path / "bcd-write-test"
+    shutil.copy2(FIXTURE, copy)
+    os.chmod(copy, 0o644)
+    bcdbackup.set_onetime_advanced_options(str(copy), enabled=True)
+    entries = bcdbackup.describe_default_entry(str(copy))
+    entry = next(e for e in entries if e.element_id == bcdbackup.ONETIME_ADVANCED_OPTIONS_ELEMENT)
+    assert entry.friendly_name == "onetimeadvancedoptions" and "true" in entry.value
 
 
 @needs_hivex
@@ -279,6 +319,38 @@ def test_restore_without_a_backup_refuses_instead_of_restoring_garbage(tmp_path)
     assert result.ok is False and "no backup" in result.message.lower()
 
 
+@needs_hivex
+def test_describe_live_mounts_read_only_not_read_write(monkeypatch, tmp_path):
+    monkeypatch.setattr(bcdbackup, "find_windows_esp", lambda *a, **k: _fake_esp())
+    esp_mount = tmp_path / "esp"
+    (esp_mount / "EFI" / "Microsoft" / "Boot").mkdir(parents=True)
+    shutil.copy2(FIXTURE, esp_mount / bcdbackup.BCD_SUBPATH)
+
+    mount_calls = []
+    real_run = subprocess.run
+
+    def spying_run(argv, **kwargs):
+        mount_calls.append(argv)
+        if argv[0] == "mount":
+            return subprocess.CompletedProcess(argv, 0, "", "")
+        if argv[0] == "umount":
+            return subprocess.CompletedProcess(argv, 0, "", "")
+        return real_run(argv, **kwargs)
+
+    monkeypatch.setattr(bcdbackup.tempfile, "mkdtemp", lambda prefix="": str(esp_mount))
+    monkeypatch.setattr(bcdbackup.os, "rmdir", lambda *a, **k: None)
+    result = bcdbackup.describe_live_boot_entry(run=spying_run)
+    assert result.ok is True and "description" in result.message.lower()
+    mount_argv = next(c for c in mount_calls if c[0] == "mount")
+    assert "-o" in mount_argv and "ro" in mount_argv              # never mounted read-write just to look around
+
+
+def test_helper_main_describe_mode_works(monkeypatch):
+    monkeypatch.setattr(bcdbackup, "describe_live_boot_entry",
+                        lambda *a, **k: bcdbackup.WriteResult(True, "fake listing"))
+    assert bcdbackup.helper_main(["describe"], geteuid=lambda: 0) == 0
+
+
 # --------------------------------------------------------------------------------------------------------- helper --
 
 def test_the_helper_refuses_to_run_unprivileged():
@@ -315,3 +387,8 @@ def test_the_desktop_file_is_clearly_labeled_experimental_and_opens_the_right_gu
 def test_the_gui_shows_the_experimental_warning():
     source = open(os.path.join(ROOT, "installer/lintab/bcdwrite_gui.py")).read()
     assert "experimental" in source.lower() and "not yet" in source.lower()
+
+
+def test_the_gui_offers_the_read_only_describe_action_too():
+    source = open(os.path.join(ROOT, "installer/lintab/bcdwrite_gui.py")).read()
+    assert '"describe"' in source and "Read-only" in source
