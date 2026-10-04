@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: MIT
-"""“Restart into Windows”: a normal restart, or an attempt at Windows Recovery or Safe Mode.
+"""“Restart into Windows”: a normal restart, an attempt at Windows Recovery, or the way to Safe Mode.
 
-See lintab.winrecovery for exactly what "Recovery" does and why it isn't guaranteed to land you there directly.
+See lintab.winrecovery for exactly what "Recovery" does — tested on a real Duet 3, with real, honest results.
 """
 
 from __future__ import annotations
@@ -20,8 +20,7 @@ from . import winrecovery  # noqa: E402
 CHOICES = (
     ("normal", "Restart into Windows", "A normal restart, straight into Windows."),
     ("recovery", "Restart into Windows Recovery",
-     "Tries a standard UEFI signal Windows is documented to check for this. Not confirmed to work on this "
-     "tablet — " + winrecovery.RECOVERY_FALLBACK),
+     winrecovery.RECOVERY_EFFECT + " " + winrecovery.RECOVERY_STEPS),
     ("safe", "Restart into Windows Safe Mode",
      "Same attempt as Recovery, since Safe Mode lives inside Windows' own recovery menu, not as a separate boot "
      "choice. " + winrecovery.SAFE_MODE_STEPS),

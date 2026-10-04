@@ -128,6 +128,6 @@ def test_every_choice_explains_itself_honestly():
     keys = [key for key, _label, _subtitle in restartwindows_gui.CHOICES]
     assert keys == ["normal", "recovery", "safe"]
     recovery_subtitle = next(s for k, _l, s in restartwindows_gui.CHOICES if k == "recovery")
-    assert "Not confirmed to work" in recovery_subtitle            # never oversold as guaranteed
+    assert "Automatic Repair" in recovery_subtitle and "does not open" in recovery_subtitle  # states the real, tested effect
     safe_subtitle = next(s for k, _l, s in restartwindows_gui.CHOICES if k == "safe")
     assert "press 4" in safe_subtitle                               # the real remaining steps are stated, not hidden

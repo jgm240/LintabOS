@@ -259,16 +259,19 @@ read from upstream sources and other people's probes, so treat them as expected-
   built, signed and checked with `aapt`/`apksigner`. **Not tested**: Waydroid itself on this tablet, cage and Android with touch and the
   panel's orientation, whether Android can reach the listener on a real Waydroid network (a firewall could block it), and whether the
   power key reaches Android as its power button.
-- **Restart into Windows: Recovery and Safe Mode (0.3.9)**. The shortcut now opens a small chooser: a normal restart
-  (unchanged), **Restart into Windows Recovery**, and **Restart into Windows Safe Mode**. Recovery sets the standard
-  UEFI `OsIndications` variable's documented "start OS recovery" bit before rebooting — a real UEFI-spec mechanism,
-  confirmed safe to attempt (the same variable systemd-boot and GNOME already use for "reboot to firmware setup",
-  just a different bit), but **not independently confirmed to make Windows actually honor it** on any real hardware.
-  If it doesn't, the tablet just boots into Windows normally — the real, manual way in (Settings → Recovery →
-  Advanced startup, or holding Shift while choosing Restart) is always shown alongside it, not hidden as a silent
-  fallback. Safe Mode makes the same attempt, since it lives inside Windows' own recovery menu rather than being a
-  separate boot choice; reaching it directly would need editing Windows' Boot Configuration Data, a binary registry
-  hive LintabOS does not write to anywhere (same reasoning as LinWinMod's read-only registry browser).
+- **Restart into Windows: Recovery and Safe Mode (0.3.9, confirmed on real hardware in 0.3.10)**. The shortcut opens
+  a small chooser: a normal restart (unchanged), **Restart into Windows Recovery**, and **Restart into Windows Safe
+  Mode**. Recovery sets the standard UEFI `OsIndications` variable's documented "start OS recovery" bit before
+  rebooting (the same firmware variable systemd-boot and GNOME already use for "reboot to firmware setup", just a
+  different bit) — **tested on a real Duet 3: this does not open the Troubleshoot/Advanced Options menu.** It
+  triggers Windows' own Startup Repair check instead (a few seconds of "Automatic Repair on drive C:"), which finds
+  nothing wrong and boots normally when Windows is healthy — a real, confirmed effect, harmless either way, kept
+  because it's a genuine (if different) Windows diagnostic rather than a silent no-op. The reliable way in (Settings
+  → Recovery → Advanced startup, or holding Shift while choosing Restart *from within Windows* — a Windows feature,
+  unrelated to this UEFI variable) is shown alongside it every time, not as a fallback for a silent failure. Safe
+  Mode makes the same attempt, since it lives inside Windows' own recovery menu rather than being a separate boot
+  choice; reaching it directly would need editing Windows' Boot Configuration Data, a binary registry hive LintabOS
+  does not write to anywhere (same reasoning as LinWinMod's read-only registry browser).
 - **WinTermMod**: a terminal, positioned at your mounted Windows drive (same Fast-Startup/BitLocker checks as
   LinWinMod), for `find`/`grep`/scripting against your Windows files directly. **It is not Windows `cmd.exe`** — a
   native Windows program can't run outside Windows at all, and running one against your real Windows system drive

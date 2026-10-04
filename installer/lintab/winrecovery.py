@@ -7,14 +7,15 @@ Windows" shortcut already did.
 
 **Restart into Windows Recovery** does the same, and *also* sets the standard UEFI ``OsIndications`` firmware
 variable's ``EFI_OS_INDICATIONS_START_OS_RECOVERY`` bit (``0x20``) before rebooting — the UEFI-spec-defined signal an
-OS's boot manager is meant to check for "start in recovery". **This is not independently confirmed to work on
-Windows.** The bit itself is real, documented in the UEFI specification, and setting it is exactly as safe as the
-well-established "reboot to firmware setup" mechanism (the same variable, a different, confirmed bit, used by
-systemd-boot and GNOME's own "Restart to boot options") — but whether this particular build of Windows' own boot
-manager acts on *this* bit has not been verified here, despite real effort to check. If it doesn't, the tablet
-simply boots into Windows normally: the worst case is no effect, not harm. The real, manual way in (Settings →
-Recovery → Advanced startup, or holding Shift while choosing Restart from within Windows) is always shown
-alongside this, never only as a fallback for when the automatic attempt fails silently.
+OS's boot manager is meant to check for "start in recovery". **Tested on a real Duet 3: this does not land you in
+the Troubleshoot/Advanced Options menu.** What it actually does is trigger Windows' own automatic Startup Repair
+check — a few seconds of "Automatic Repair on drive C:" — which, finding nothing wrong, boots normally. That's a
+different, narrower mechanism than the one this was aiming for, but it is a real, confirmed effect, not a silent
+no-op, and it is harmless either way: Startup Repair is a normal, safe Windows diagnostic that does nothing when
+there's nothing to fix, and if there genuinely were a startup problem, this is one of the ways Windows' own repair
+tools get a chance to catch it. Kept for that reason, with the real, reliable way in (Settings → Recovery →
+Advanced startup, or holding Shift while choosing Restart from within Windows) always shown alongside it — never
+only as a fallback for when the automatic attempt doesn't do what you wanted.
 
 **Restart into Windows Safe Mode** makes the same Recovery attempt, because Safe Mode lives inside the Recovery
 Environment's own menus (Troubleshoot → Advanced options → Startup Settings → Restart → press 4), not as a separate
@@ -42,9 +43,12 @@ DEFAULT_ATTRS = b"\x07\x00\x00\x00"  # NON_VOLATILE | BOOTSERVICE_ACCESS | RUNTI
 HELPER = "/usr/libexec/lintab/reboot-windows"
 MODES = ("normal", "recovery")
 
-RECOVERY_FALLBACK = ("If this doesn't land you in Windows Recovery, you can still get there by hand once Windows "
-                     "has started: Settings → System → Recovery → Advanced startup → Restart now, or hold Shift "
-                     "while choosing Restart.")
+RECOVERY_EFFECT = ("Confirmed on a real Duet 3: this does not open the Troubleshoot/Advanced Options menu. It "
+                   "triggers Windows' own Startup Repair check instead — a few seconds of \u201cAutomatic Repair "
+                   "on drive C:\u201d — which finds nothing wrong and boots normally when Windows is healthy. "
+                   "Harmless, and a real (if different) effect, not a silent no-op.")
+RECOVERY_STEPS = ("The reliable way in: once Windows has started, Settings → System → Recovery → Advanced "
+                  "startup → Restart now, or hold Shift while choosing Restart.")
 SAFE_MODE_STEPS = ("Once in Windows Recovery: Troubleshoot → Advanced options → Startup Settings → Restart, "
                    "then press 4 (or Fn+4) for Safe Mode.")
 
@@ -87,7 +91,7 @@ def helper_main(argv: list[str], run=subprocess.run, geteuid=os.geteuid) -> int:
         print("grub-reboot failed; not rebooting.", file=sys.stderr)
         return 3
     if mode == "recovery":
-        set_os_indications(START_OS_RECOVERY)   # best effort, see module docstring; never blocks the reboot
+        set_os_indications(START_OS_RECOVERY)   # confirmed effect: triggers Startup Repair, not the Troubleshoot menu
     run(["systemctl", "reboot"])
     return 0
 

@@ -149,10 +149,10 @@ Linux terminal there.
 
 Setting the UEFI `OsIndications` variable's `EFI_OS_INDICATIONS_START_OS_RECOVERY` bit is a real, UEFI-specification
 mechanism, and writing to it is exactly as safe as the well-established "reboot to firmware setup" feature already
-used by systemd-boot and GNOME (the same variable, a different, already-confirmed bit). What is **not** verified is
-whether Windows' own boot manager acts on this particular bit on any real hardware tested here — real effort went
-into checking this (the UEFI-spec bit value itself was confirmed from spec-derived sources), but no confirmation
-either way was found for the Windows side. Reaching Safe Mode directly, skipping Windows' own recovery menu, would
+used by systemd-boot and GNOME (the same variable, a different, already-confirmed bit). **Tested on a real Duet 3 (0.3.10): Windows' own boot manager does not open the Troubleshoot/Advanced Options
+menu in response to this bit.** What it does instead is trigger Windows' own Startup Repair check, a different,
+narrower mechanism, kept because it is a real and harmless effect rather than a silent no-op. Reaching Safe Mode
+directly, skipping Windows' own recovery menu, would
 need editing Windows' Boot Configuration Data (BCD) — a binary registry hive. LintabOS does not do this: a wrong
 BCD edit can leave Windows unable to boot at all, a risk that cannot be ruled out here without a real Windows BCD
 store to test against, so the last few clicks inside Windows' own menu are the trade made instead.
