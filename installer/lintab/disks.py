@@ -86,6 +86,10 @@ class Partition:
     def is_ms_data(self) -> bool:
         return self.type_guid == GUID_MS_BASIC_DATA
 
+    @property
+    def is_win_re(self) -> bool:
+        return self.type_guid == GUID_WIN_RE
+
 
 @dataclass
 class FreeRegion:

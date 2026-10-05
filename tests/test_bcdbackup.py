@@ -40,38 +40,34 @@ def _write_supply(root, name: str, kind: str, **attrs):
         (d / key).write_text(str(value))
 
 
-def test_no_power_supplies_at_all_means_cannot_tell_not_fine(tmp_path):
+def test_no_power_supplies_at_all_means_no_battery_reading_which_is_fine(tmp_path):
+    """Unlike the old AC-connected check, no power_supply directory at all just means "can't read a battery
+    level" - treated the same as "no battery reported", not as a refusal (see test_no_battery_reported_at_all_*)."""
     missing = tmp_path / "does-not-exist"
-    assert bcdbackup.ac_connected(str(missing)) is None
-    ok, reason = bcdbackup.power_safe_to_write(str(missing))
-    assert ok is False and "power" in reason.lower()
+    assert bcdbackup.battery_percent(str(missing)) is None
+    ok, _reason = bcdbackup.power_safe_to_write(str(missing))
+    assert ok is True
 
 
-def test_on_battery_with_no_charger_refuses(tmp_path):
-    _write_supply(tmp_path, "BAT0", "Battery", capacity=90)
-    _write_supply(tmp_path, "AC0", "Mains", online=0)
-    ok, reason = bcdbackup.power_safe_to_write(str(tmp_path))
-    assert ok is False and "charger" in reason.lower()
-
-
-def test_on_charger_but_battery_below_minimum_refuses(tmp_path):
+def test_battery_below_minimum_refuses(tmp_path):
     _write_supply(tmp_path, "BAT0", "Battery", capacity=39)
-    _write_supply(tmp_path, "AC0", "Mains", online=1)
     ok, reason = bcdbackup.power_safe_to_write(str(tmp_path))
     assert ok is False and "39%" in reason
 
 
-def test_on_charger_at_exactly_the_minimum_is_fine(tmp_path):
+def test_battery_at_exactly_the_minimum_is_fine(tmp_path):
     _write_supply(tmp_path, "BAT0", "Battery", capacity=40)
-    _write_supply(tmp_path, "AC0", "Mains", online=1)
     ok, reason = bcdbackup.power_safe_to_write(str(tmp_path))
     assert ok is True and reason == ""
 
 
-def test_usb_c_charging_counts_as_a_charger_not_just_mains(tmp_path):
+def test_no_charger_needed_as_long_as_battery_is_high_enough(tmp_path):
+    """The charger requirement was dropped: being tethered to AC power was more friction than protection once the
+    battery threshold alone covers the case a power loss mid-write would actually need. Note: no AC/Mains/USB
+    supply is written here at all - only a battery - and that's still fine."""
     _write_supply(tmp_path, "BAT0", "Battery", capacity=100)
-    _write_supply(tmp_path, "usb0", "USB_PD", online=1)
-    assert bcdbackup.ac_connected(str(tmp_path)) is True
+    ok, reason = bcdbackup.power_safe_to_write(str(tmp_path))
+    assert ok is True and reason == ""
 
 
 def test_a_hid_peripheral_battery_does_not_shadow_the_real_system_battery(tmp_path):
@@ -91,9 +87,9 @@ def test_the_hid_filter_is_a_name_prefix_not_a_substring_match(tmp_path):
     assert bcdbackup.battery_percent(str(tmp_path)) == 55
 
 
-def test_no_battery_reported_at_all_does_not_block_a_connected_charger(tmp_path):
-    """Some devices report no Battery node at all while genuinely plugged in - absence of a reading must not be
-    treated as "below the minimum"."""
+def test_no_battery_reported_at_all_is_not_treated_as_below_the_minimum(tmp_path):
+    """Some devices report no Battery node at all (e.g. a Mains-only supply present) - absence of a reading must
+    not be treated as "below the minimum"."""
     _write_supply(tmp_path, "AC0", "Mains", online=1)
     ok, _reason = bcdbackup.power_safe_to_write(str(tmp_path))
     assert ok is True
@@ -213,10 +209,10 @@ def _fake_esp():
 
 
 def test_the_power_gate_runs_before_anything_else_is_even_looked_at(monkeypatch, tmp_path):
-    missing = tmp_path / "no-such-dir"
+    _write_supply(tmp_path, "BAT0", "Battery", capacity=10)        # below the minimum: the gate must refuse
     called = []
     monkeypatch.setattr(bcdbackup, "find_windows_esp", lambda *a, **k: called.append("find_esp") or _fake_esp())
-    result = bcdbackup.write_onetime_advanced_options_safely(power_supply_dir=str(missing))
+    result = bcdbackup.write_onetime_advanced_options_safely(power_supply_dir=str(tmp_path))
     assert result.ok is False
     assert called == []                     # never got far enough to look for the ESP at all
 

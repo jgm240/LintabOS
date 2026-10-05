@@ -96,19 +96,22 @@ def windows_partitions() -> list[WindowsPartition]:
 
 
 def list_microsoft_data_partitions() -> list[WindowsPartition]:
-    """Every partition with the Microsoft basic data GPT type on every disk, not just the one(s)
-    windows_partitions() recognises as "the Windows install". Deliberately keyed off the partition's GPT *type*,
-    not its probed filesystem content: an NTFS volume that content-probing couldn't read cleanly (unclean, unusual,
-    or just unlucky) still carries this type and is still worth examining, where fstype-based matching would miss
-    it. This is also exactly why the EFI System Partition, LintabOS's own root, and swap can never appear here: they
+    """Every partition with the Microsoft basic data *or* Windows Recovery Environment GPT type on every disk, not
+    just the one(s) windows_partitions() recognises as "the Windows install". Deliberately keyed off the
+    partition's GPT *type*, not its probed filesystem content: an NTFS volume that content-probing couldn't read
+    cleanly (unclean, unusual, or just unlucky) still carries one of these types and is still worth examining,
+    where fstype-based matching would miss it. The Windows Recovery Environment partition (WINRE_DRV, found live
+    on a real Duet 3) is genuinely NTFS-formatted but carries its own distinct GPT type, not Microsoft basic data -
+    without matching it too, a real NTFS partition was silently invisible to this "every NTFS partition" picker.
+    This is also exactly why the EFI System Partition, LintabOS's own root, and swap can never appear here: they
     carry different GPT types, by construction, regardless of what's on them. For picking a partition by hand when
     automatic detection finds nothing. BitLocker-encrypted partitions need the recovery key first (Unlock BitLocker
-    Drive), so they aren't listed here even though they share this same GPT type."""
+    Drive), so they aren't listed here even though they can share one of these same GPT types."""
     from . import disks
     found = []
     for disk in disks.list_disks(hide=""):
         for part in disk.partitions:
-            if part.is_ms_data and not disks.is_bitlocker(part):
+            if (part.is_ms_data or part.is_win_re) and not disks.is_bitlocker(part):
                 uuid = disks.run(["blkid", "-s", "UUID", "-o", "value", part.path], check=False).stdout.strip()
                 if uuid:
                     found.append(WindowsPartition(part.path, uuid, part.size, part.fstype))

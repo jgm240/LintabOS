@@ -165,8 +165,8 @@ the alternative — Shift+Restart / `shutdown /r /o` inside Windows itself — w
 only offering the same flag from outside Windows. The risk that remains is a bad write leaving Windows unable to
 boot, which a blocklist-style "safe subset" cannot rule out any more than it could for the general registry (see
 above) — so instead of trying to carve out a safe subset, the write itself is wrapped in a safety net that assumes
-it could fail, every time it runs: refuses without AC power and at least 40% battery (the ESP is FAT32, not
-journaled, and a write torn by power loss can corrupt more than the one file); always backs up the live BCD first;
+it could fail, every time it runs: refuses below 40% battery (the ESP is FAT32, not journaled, and a write torn by
+power loss can corrupt more than the one file); always backs up the live BCD first;
 re-opens and verifies the result in a fresh hivex handle rather than trusting that the write call not raising means
 it worked; and automatically restores the backup the moment that verification fails, for any reason, before
 control ever returns to the user. It ships as a separate, clearly-labeled "(Experimental)" tool rather than

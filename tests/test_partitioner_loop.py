@@ -297,6 +297,30 @@ def test_a_plain_ntfs_data_partition_is_invisible_to_automatic_detection(tmp_pat
         subprocess.run(["losetup", "-d", loop], capture_output=True)
 
 
+def test_the_windows_recovery_partition_is_not_invisible_to_the_ntfs_picker(tmp_path, monkeypatch):
+    """Found live on a real Duet 3: WINRE_DRV is genuinely NTFS-formatted but carries the Windows Recovery
+    Environment GPT type, not Microsoft basic data - list_microsoft_data_partitions() only matched the latter, so
+    a real NTFS partition silently never appeared in the "every NTFS partition" picker."""
+    img = tmp_path / "disk.img"
+    with open(img, "wb") as f:
+        f.truncate(4 * GiB)
+    loop = sh("losetup", "--find", "--show", "--partscan", str(img)).strip()
+    try:
+        sh("sfdisk", loop, input=f"label: gpt\nsize=1900MiB, type={disks.GUID_WIN_RE}, name=WinRE\n")
+        part = f"{loop}p1"
+        for _ in range(50):
+            if os.path.exists(part):
+                break
+            subprocess.run(["sleep", "0.1"])
+        sh("mkfs.ntfs", "-Q", "-F", "-L", "WINRE_DRV", part)
+
+        monkeypatch.setattr(disks, "list_disks", lambda hide=None: [disks.read_disk(loop)])
+        found = winfiles.list_microsoft_data_partitions()
+        assert any(p.path == part for p in found)
+    finally:
+        subprocess.run(["losetup", "-d", loop], capture_output=True)
+
+
 def test_enable_with_an_explicit_partition_sets_up_exactly_that_one(tmp_path):
     """The CLI --partition flag: lintab-windows-files enable --read-write --partition PATH must point the fstab
     entry at a real, chosen, non-"Windows" NTFS partition (real blkid UUID included), even though automatic

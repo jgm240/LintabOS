@@ -44,12 +44,12 @@ from typing import Optional
 
 # -------------------------------------------------------------------------------------------------- power gate --
 # A torn write to a FAT32 ESP (not journaled) from a mid-write power loss can corrupt more than the one file, so
-# this refuses to even attempt the write unless power looks safe. "Can't tell" is treated as "not safe", not as
-# "assume fine" - see power_safe_to_write.
+# this refuses to even attempt the write unless the battery itself looks safe. "Can't tell" is treated as "not
+# safe", not as "assume fine" - see power_safe_to_write. (No longer requires AC power to be connected at all -
+# that was more friction than protection once the battery threshold already covers the low-charge case.)
 
 POWER_SUPPLY_DIR = "/sys/class/power_supply"
 MIN_BATTERY_PERCENT = 40
-_AC_SUPPLY_TYPES = ("Mains", "USB", "USB_PD", "USB_PD_DRP", "USB_DCP", "USB_CDP", "USB_ACA")
 
 
 def _read_text(path: str) -> Optional[str]:
@@ -77,24 +77,6 @@ def _is_peripheral_supply(name: str) -> bool:
     return name.lower().startswith("hid-")
 
 
-def ac_connected(power_supply_dir: str = POWER_SUPPLY_DIR, listdir=os.listdir) -> Optional[bool]:
-    """True/False once a Mains or USB power supply is found and its ``online`` file read. None if no such supply
-    exists at all (can't tell either way) - callers must treat that the same as "not connected", never as "fine"."""
-    try:
-        names = listdir(power_supply_dir)
-    except OSError:
-        return None
-    found = False
-    for name in names:
-        if _is_peripheral_supply(name):
-            continue
-        if _read_text(os.path.join(power_supply_dir, name, "type")) in _AC_SUPPLY_TYPES:
-            found = True
-            if _read_int(os.path.join(power_supply_dir, name, "online")) == 1:
-                return True
-    return False if found else None
-
-
 def battery_percent(power_supply_dir: str = POWER_SUPPLY_DIR, listdir=os.listdir) -> Optional[int]:
     """The device's own battery level - never a connected peripheral's. See _is_peripheral_supply: a real Duet 3
     has a second "Battery"-typed node for a stylus/keyboard case, which a naive first-match would pick up instead
@@ -113,13 +95,10 @@ def battery_percent(power_supply_dir: str = POWER_SUPPLY_DIR, listdir=os.listdir
 
 def power_safe_to_write(power_supply_dir: str = POWER_SUPPLY_DIR, min_battery: int = MIN_BATTERY_PERCENT,
                         listdir=os.listdir) -> tuple[bool, str]:
-    """(ok, reason). Refuses - with a reason a user can act on - unless AC is connected and the battery (if any
-    is reported at all) is at or above ``min_battery``."""
-    ac = ac_connected(power_supply_dir, listdir)
-    if ac is None:
-        return False, "Could not tell whether this device is on AC power - refusing to risk an interrupted write."
-    if not ac:
-        return False, "Not connected to a charger. Plug in before writing the boot configuration."
+    """(ok, reason). Refuses - with a reason a user can act on - unless the battery (if any is reported at all)
+    is at or above ``min_battery``. No longer requires AC power to be connected (dropped: being tethered to a
+    charger just to use a tablet tool was more friction than the marginal safety it added once the battery
+    threshold alone already rules out the low-charge case a power loss mid-write would actually need)."""
     battery = battery_percent(power_supply_dir, listdir)
     if battery is not None and battery < min_battery:
         return False, f"Battery is at {battery}%, below the required {min_battery}%. Charge it further first."

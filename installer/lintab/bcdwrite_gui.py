@@ -43,7 +43,7 @@ class BcdWriteWindow(Adw.ApplicationWindow):
         write_row = Adw.ActionRow(
             title="Write onetimeadvancedoptions",
             subtitle="Backs up the live BCD, writes the flag, verifies the result, and automatically restores "
-                     "the backup if verification fails. Requires AC power and at least 40% battery.",
+                     "the backup if verification fails. Requires at least 40% battery.",
             activatable=True)
         write_row.add_suffix(Gtk.Image(icon_name="go-next-symbolic"))
         write_row.connect("activated", lambda _r: self._run("write"))

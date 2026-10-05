@@ -273,6 +273,12 @@ read from upstream sources and other people's probes, so treat them as expected-
   choice; reaching it directly needs editing Windows' Boot Configuration Data, a binary registry hive — see
   **"Windows Boot Configuration (Experimental)" (0.3.11)** below for the one place LintabOS now does exactly that,
   and the safety net around it.
+- **LinWinMod NTFS picker: the Windows Recovery partition was invisible to it (0.3.14)**: found live on a real
+  Duet 3 - `WINRE_DRV` is genuinely NTFS-formatted but carries the Windows Recovery Environment GPT type, not
+  Microsoft basic data, so `list_microsoft_data_partitions()` (the manual "pick any NTFS partition" picker) never
+  matched it, silently breaking its own "every NTFS partition" promise. Now matches both GPT types. Also: the
+  BCD write's power gate no longer requires AC power to be connected, only the 40% battery minimum - being
+  tethered to a charger just to use the tool was more friction than the marginal protection it added.
 - **Windows Boot Configuration bug fix + read-only inspection (0.3.12)**: within hours of 0.3.11 shipping, a real
   Duet 3 test found the power gate refusing to write because it read a connected stylus/keyboard case's own HID
   battery (reporting 0%) instead of the tablet's real battery (`BATX`, 72% and charging) - the tablet exposes two
