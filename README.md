@@ -273,6 +273,21 @@ read from upstream sources and other people's probes, so treat them as expected-
   choice; reaching it directly needs editing Windows' Boot Configuration Data, a binary registry hive — see
   **"Windows Boot Configuration (Experimental)" (0.3.11)** below for the one place LintabOS now does exactly that,
   and the safety net around it.
+- **LinWinMod "Open Windows files" never actually worked on this kernel - three compounding bugs (0.3.16)**: found
+  live in one chain on the same real Duet 3. `bitlocker.probe()` (the health check run before every mount) called
+  `ntfsresize` via bare `subprocess.run`, missing the PATH fix 0.3.5 made for `sfdisk` elsewhere - "can't find
+  ntfsresize" on a session whose `PATH` excludes `/usr/sbin`. Fixed that, and found the *next* layer: Debian's
+  kernel package doesn't build the in-kernel `ntfs3` driver at all (`modprobe ntfs3` → "Module not found"), so
+  `mount_fstype()` requesting exactly that nonexistent driver meant the fstab mount always failed with "unknown
+  filesystem type 'ntfs3'" - switched to plain `ntfs`, which dispatches to this project's own `ntfs-3g` dependency
+  via the standard `mount.<fstype>` helper convention, no kernel module needed. Found a third layer underneath
+  that: the pre-flight health check needs raw device access to read NTFS's dirty/hibernation flags - the same
+  permission wall 0.3.15 hit for `sfdisk` - so unprivileged it could *never* succeed, and all three callers
+  (LinWinMod, WinTermMod, the read-write CLI flag) treated that as a hard refusal forever, regardless of the
+  other two fixes. `probe()` now returns a distinct `kind="unreadable"` for exactly this case, and all three
+  callers treat it as inconclusive rather than blocking, falling through to the real, privileged mount attempt.
+  Confirmed live, end to end: the fstab entry now reads `ntfs`, and `mount /media/windows` actually succeeds,
+  read-write, listing the real Windows C: drive.
 - **LinWinMod: the NTFS picker was invisible, not just missing an entry (0.3.15)**: `disks.read_disk()` has always
   read the partition table via `sfdisk -J`, which needs raw device access (`root:disk`, mode `660`) that
   LinWinMod's deliberately-unprivileged scan was never granted - so it silently got zero partitions back, every

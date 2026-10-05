@@ -128,24 +128,28 @@ def test_turning_it_off_is_the_one_that_asks_for_a_password():
 def test_fstab_block_is_read_only_owned_by_the_user_and_listed_in_the_sidebar():
     block = winfiles.fstab_block("ABCD1234", 1000, 1000)
     line = [l for l in block.splitlines() if l.startswith("UUID=")][0]
-    assert line.startswith("UUID=ABCD1234 /media/windows ntfs3 ro,uid=1000,gid=1000,")
+    assert line.startswith("UUID=ABCD1234 /media/windows ntfs ro,uid=1000,gid=1000,")
     for option in ("nofail", "noauto", "x-systemd.automount", "x-gvfs-show", "x-gvfs-name=Windows"):
         assert option in line
     assert "rw," in winfiles.fstab_block("A", 1, 1, read_write=True)
 
 
 def test_the_mount_driver_matches_the_partitions_real_filesystem():
-    assert winfiles.mount_fstype("ntfs") == "ntfs3" and winfiles.mount_fstype("NTFS") == "ntfs3"
+    """Plain "ntfs", not the in-kernel "ntfs3" driver: confirmed live on a real Duet 3 that Debian's own kernel
+    package doesn't build/ship the ntfs3 module at all ("Module ntfs3 not found"), so mount -t ntfs3 always fails
+    with "unknown filesystem type 'ntfs3'" there. mount -t ntfs dispatches to /sbin/mount.ntfs -> mount.ntfs-3g,
+    the project's own ntfs-3g dependency, which works with no kernel module involved."""
+    assert winfiles.mount_fstype("ntfs") == "ntfs" and winfiles.mount_fstype("NTFS") == "ntfs"
     assert winfiles.mount_fstype("exfat") == "exfat" and winfiles.mount_fstype("exFAT") == "exfat"
-    assert winfiles.mount_fstype("") == "ntfs3"             # an unprobed/blank fstype: ntfs3 is the realistic default
-    assert winfiles.mount_fstype("ntfs3") == "ntfs3"         # already the driver name, not the content-probe string
+    assert winfiles.mount_fstype("") == "ntfs"               # an unprobed/blank fstype: ntfs is the realistic default
+    assert winfiles.mount_fstype("ntfs3") == "ntfs"          # even if something upstream still reports the old name
 
 
-def test_the_fstab_line_uses_the_right_driver_and_only_ntfs_gets_windows_names():
+def test_the_fstab_line_uses_the_right_driver():
     ntfs_line = winfiles.fstab_block("U", 1, 1, fstype="ntfs")
-    assert " ntfs3 " in ntfs_line and "windows_names" in ntfs_line
+    assert " ntfs " in ntfs_line
     exfat_line = winfiles.fstab_block("U", 1, 1, fstype="exfat")
-    assert " exfat " in exfat_line and "windows_names" not in exfat_line    # exfat doesn't understand this option
+    assert " exfat " in exfat_line
 
 
 def test_fstab_block_is_added_replaced_and_removed_without_touching_other_lines():

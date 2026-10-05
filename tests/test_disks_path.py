@@ -9,12 +9,13 @@ import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "installer"))
 
-from lintab import disks  # noqa: E402
+from lintab import bitlocker, disks  # noqa: E402
 
 
 def fake_which(name, path=None):
     """Only finds things that are "really there": in /usr/bin always, or in /usr/sbin when the given path covers it."""
-    locations = {"sfdisk": "/usr/sbin/sfdisk", "blkid": "/sbin/blkid", "ls": "/usr/bin/ls"}
+    locations = {"sfdisk": "/usr/sbin/sfdisk", "blkid": "/sbin/blkid", "ls": "/usr/bin/ls",
+                "ntfsresize": "/usr/sbin/ntfsresize"}
     target = locations.get(name)
     if target is None:
         return None
@@ -63,6 +64,46 @@ def test_run_resolves_only_the_executable_and_leaves_the_arguments_alone(monkeyp
 def test_run_with_an_empty_argv_does_not_crash(monkeypatch):
     monkeypatch.setattr(disks.subprocess, "run", lambda argv, **k: __import__("subprocess").CompletedProcess(argv, 0, "", ""))
     disks.run([], check=False)
+
+
+def test_bitlocker_probe_finds_ntfsresize_even_when_the_sessions_path_excludes_sbin(monkeypatch, tmp_path):
+    """The real bug just hit live on a Duet 3: bitlocker.probe() is called from LinWinMod/WinTermMod's
+    deliberately-unprivileged checks (see winmod_gui.py, winfiles.py, winterm.py), but used a bare
+    subprocess.run(["ntfsresize", ...]) that never went through disks.resolve_executable() at all - unlike every
+    other tool call this project already fixed for exactly this PATH gap (0.3.5, sfdisk). A plain desktop
+    session's PATH not including /usr/sbin meant "ntfsresize" was never found, raising FileNotFoundError - "can't
+    find ntfsresize" - even though the tool was genuinely installed."""
+    monkeypatch.setattr(disks.shutil, "which", fake_which)
+    monkeypatch.setattr(disks.os, "environ", {"PATH": "/usr/bin"})   # no /usr/sbin, same as a plain desktop session
+
+    captured = {}
+
+    def fake_subprocess_run(argv, **kwargs):
+        captured["argv"] = argv
+        import subprocess
+        return subprocess.CompletedProcess(argv, 1, "", "")
+
+    monkeypatch.setattr(bitlocker.subprocess, "run", fake_subprocess_run)
+    bitlocker.probe(str(tmp_path / "fake-ntfs-image"))
+    assert captured["argv"][0] == "/usr/sbin/ntfsresize"    # resolved via the sbin fallback, not left as a bare name
+
+
+def test_bitlocker_probe_treats_permission_denied_as_unreadable_not_unhealthy(monkeypatch, tmp_path):
+    """Found live on a real Duet 3, right after the PATH fix above: ntfsresize resolved correctly but still
+    couldn't open the raw device unprivileged ("Permission denied") - a real, separate permission wall, same
+    class as sfdisk's. That is not evidence the NTFS volume is actually dirty/hibernated/corrupt - callers that
+    cannot themselves elevate must treat it as inconclusive, not as a reason to refuse outright."""
+    monkeypatch.setattr(disks.shutil, "which", fake_which)
+    monkeypatch.setattr(disks.os, "environ", {"PATH": "/usr/bin"})
+
+    def fake_subprocess_run(argv, **kwargs):
+        import subprocess
+        return subprocess.CompletedProcess(
+            argv, 1, "", "ntfsresize: ERROR(13): Opening '/dev/fake' as NTFS failed: Permission denied\n")
+
+    monkeypatch.setattr(bitlocker.subprocess, "run", fake_subprocess_run)
+    info = bitlocker.probe(str(tmp_path / "fake-ntfs-image"))
+    assert info.healthy is False and info.kind == "unreadable"
 
 
 def test_windows_partitions_reads_the_uuid_through_the_same_path_safe_run():

@@ -69,7 +69,7 @@ def open_terminal(run=subprocess.run, popen=subprocess.Popen) -> int:
     except Exception as exc:  # noqa: BLE001
         tell(f"Could not check the drive: {exc}", "--error", run)
         return 1
-    if not info.healthy:
+    if not info.healthy and info.kind != "unreadable":
         messages = {
             "dirty": "Windows flagged this drive for a consistency check. Boot Windows, let it check the disk, "
                     "then shut down fully and try again.",

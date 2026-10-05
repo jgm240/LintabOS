@@ -278,7 +278,10 @@ class VolumeInfo:
     healthy: bool
     problem: str = ""  # user-facing reason when not healthy
     # Why it isn't healthy: "dirty" = flagged for a check (harmless for decrypting, blocks shrinking),
-    # "hibernated" = Windows is set to resume (blocks both), "other" = unreadable. "" when healthy.
+    # "hibernated" = Windows is set to resume (blocks both), "other" = a genuine, unexplained read failure,
+    # "unreadable" = couldn't even open the device from here (no permission) - inconclusive, not a real
+    # problem with the volume; a caller that can't itself elevate should treat this as "don't block, let the
+    # real (privileged) mount attempt decide" rather than refusing outright. "" when healthy.
     kind: str = ""
 
 
@@ -288,8 +291,16 @@ _MIN = re.compile(r"You might resize at (\d+) bytes")
 
 
 def probe(path: str) -> VolumeInfo:
-    """Inspect an NTFS image or partition (typically the decrypted view) read-only."""
-    proc = subprocess.run(["ntfsresize", "--info", "--no-progress-bar", path], capture_output=True, text=True)
+    """Inspect an NTFS image or partition (typically the decrypted view) read-only.
+
+    Called from LinWinMod/WinTermMod's deliberately-unprivileged checks (see lintab.winmod_gui, lintab.winfiles,
+    lintab.winterm) as well as from privileged flows, so - like lintab.disks.run() - this resolves ``ntfsresize``
+    itself rather than trusting a bare ``subprocess.run`` to find it on PATH: it lives in /usr/sbin, which a
+    plain unprivileged desktop session's PATH often does not include (the same real bug 0.3.5 already fixed for
+    sfdisk elsewhere - found live on a real Duet 3, in this file, which that fix never touched)."""
+    from .disks import resolve_executable
+    ntfsresize = resolve_executable("ntfsresize")
+    proc = subprocess.run([ntfsresize, "--info", "--no-progress-bar", path], capture_output=True, text=True)
     out = (proc.stdout or "") + (proc.stderr or "")
     low = out.lower()
     size = _SIZE.search(out)
@@ -304,7 +315,7 @@ def probe(path: str) -> VolumeInfo:
                           "administrator and shut down fully.", "hibernated")
     if "scheduled for check" in low or "chkdsk" in low or "inconsisten" in low or "dirty" in low:
         # --info with --force only reads; it is used here to still learn the sizes.
-        forced = subprocess.run(["ntfsresize", "--info", "--force", "--no-progress-bar", path],
+        forced = subprocess.run([ntfsresize, "--info", "--force", "--no-progress-bar", path],
                                 capture_output=True, text=True)
         fout = (forced.stdout or "") + (forced.stderr or "")
         fsize, fused, fmin = _SIZE.search(fout), _USED.search(fout), _MIN.search(fout)
@@ -320,5 +331,14 @@ def probe(path: str) -> VolumeInfo:
         return VolumeInfo(int(fsize.group(1)) if fsize else 0,
                           int(fused.group(1)) * 1_000_000 if fused else 0,
                           int(fmin.group(1)) if fmin else 0, False, problem, "dirty")
-    problem = "The Windows file system could not be read: " + (out.strip().splitlines() or ["unknown error"])[-1]
+    last_line = (out.strip().splitlines() or ["unknown error"])[-1]
+    if "permission denied" in low:
+        # Not a real NTFS problem - just couldn't open the device from here (e.g. LinWinMod's deliberately-
+        # unprivileged pre-flight check, which can never read raw device bytes - confirmed live on a real Duet
+        # 3). Distinct from "other" so a caller that can't itself elevate knows this result is inconclusive, not
+        # a real reason to block: the actual (privileged) mount attempt that follows is the real arbiter.
+        return VolumeInfo(0, 0, 0, False,
+                          "Could not check from here (no permission to read the drive directly) - this does not "
+                          "mean anything is wrong with it.", "unreadable")
+    problem = "The Windows file system could not be read: " + last_line
     return VolumeInfo(int(size.group(1)) if size else 0, 0, 0, False, problem, "other")

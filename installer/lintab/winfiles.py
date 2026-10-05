@@ -34,10 +34,15 @@ class WindowsPartition:
 
 
 def mount_fstype(fstype: str) -> str:
-    """The filesystem type to hand to `mount` for a probed fstype string. Defaults to ntfs3: on a Microsoft-data-GUID
-    partition (the only kind offered here) that is overwhelmingly the realistic case even when the content probe
-    came back blank or unexpected, which does happen on an unclean or unusual NTFS volume."""
-    return "exfat" if fstype.lower() == "exfat" else "ntfs3"
+    """The filesystem type to hand to `mount` for a probed fstype string. Defaults to ntfs (not the newer in-kernel
+    ntfs3 driver): confirmed live on a real Duet 3 that Debian's own kernel package does not build/ship the ntfs3
+    module at all ("Module ntfs3 not found"), so `mount -t ntfs3` always fails there with "unknown filesystem type
+    'ntfs3'". `mount -t ntfs` instead dispatches to the `/sbin/mount.ntfs` helper, which this project's own
+    `ntfs-3g` dependency installs as a symlink to itself - the same userspace driver, just reached the standard
+    way `mount` is meant to find it, rather than naming a kernel module that may not exist. Plain "ntfs" is also
+    overwhelmingly the realistic case on a Microsoft-data-GUID partition (the only kind offered here) even when
+    the content probe came back blank or unexpected, which does happen on an unclean or unusual NTFS volume."""
+    return "exfat" if fstype.lower() == "exfat" else "ntfs"
 
 
 def fstab_block(uuid: str, uid: int, gid: int, read_write: bool = False, mount_point: str = MOUNT_POINT,
@@ -48,8 +53,6 @@ def fstab_block(uuid: str, uid: int, gid: int, read_write: bool = False, mount_p
         "x-gvfs-show", "x-gvfs-name=Windows", "x-gvfs-icon=drive-harddisk",
     ]
     driver = mount_fstype(fstype)
-    if driver == "ntfs3":
-        opts.insert(5, "windows_names")   # an ntfs3-only mount option; exfat doesn't understand it
     return f"{BEGIN}\nUUID={uuid} {mount_point} {driver} {','.join(opts)} 0 0\n{END}\n"
 
 
@@ -189,7 +192,7 @@ def main(argv: Optional[list[str]] = None) -> int:
     if args.read_write:
         from . import bitlocker
         info = bitlocker.probe(max(parts, key=lambda p: p.size).path)
-        if not info.healthy:
+        if not info.healthy and info.kind != "unreadable":
             print("Refusing read-write: Windows left this drive unclean or hibernated (Fast Startup). "
                   "Boot Windows, run `powercfg /h off`, shut down fully, then try again.", file=sys.stderr)
             return 3

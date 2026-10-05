@@ -165,7 +165,7 @@ class FilesPage(Gtk.Box):
             self.status.set_text(f"Could not check the drive: {error}")
             self.button.set_sensitive(True)
             return False
-        if not info.healthy:
+        if not info.healthy and info.kind != "unreadable":
             messages = {
                 "dirty": "Windows flagged this drive for a consistency check. Boot Windows, let it check the disk, "
                         "then shut down fully and try again.",
@@ -175,6 +175,8 @@ class FilesPage(Gtk.Box):
             self.status.set_text(messages.get(info.problem, info.problem or "This drive isn't safe to write to right now."))
             self.button.set_sensitive(True)
             return False
+        # info.kind == "unreadable": this unprivileged check simply couldn't tell - not a reason to block. The
+        # mount step just below is privileged (pkexec) and is the real, authoritative check.
         self.status.set_text("Opening…")
 
         def work() -> None:

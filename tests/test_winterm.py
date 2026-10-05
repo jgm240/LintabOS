@@ -70,11 +70,30 @@ def test_an_unclean_drive_is_refused_with_the_right_message(monkeypatch):
     from lintab import bitlocker
     part = winfiles.WindowsPartition("/dev/sda3", "U", 10, "ntfs")
     monkeypatch.setattr(winfiles, "windows_partitions", lambda: [part])
-    monkeypatch.setattr(bitlocker, "probe", lambda path: type("I", (), {"healthy": False, "problem": "hibernated"})())
+    monkeypatch.setattr(bitlocker, "probe",
+                        lambda path: type("I", (), {"healthy": False, "problem": "hibernated", "kind": "hibernated"})())
     rec = Recorder()
     monkeypatch.setattr(winterm.shutil, "which", rec.which)
     assert winterm.open_terminal(run=rec.run, popen=rec.popen) == 1
     assert "Fast Startup" in rec.messages[0][-1] and not rec.popened
+
+
+def test_an_unreadable_probe_does_not_block_proceeding_to_the_real_privileged_check(monkeypatch):
+    """info.kind == "unreadable" means the unprivileged probe simply couldn't tell (no permission to read the
+    raw device - confirmed live on a real Duet 3), not that the volume is actually unhealthy. That must not
+    refuse outright; it must fall through to the real, privileged mount attempt, same as a healthy result."""
+    from lintab import bitlocker, winmod
+    part = winfiles.WindowsPartition("/dev/sda3", "U", 10, "ntfs")
+    monkeypatch.setattr(winfiles, "windows_partitions", lambda: [part])
+    monkeypatch.setattr(bitlocker, "probe",
+                        lambda path: type("I", (), {"healthy": False, "problem": "unreadable", "kind": "unreadable"})())
+    monkeypatch.setattr(winterm, "find_terminal", lambda **k: "/usr/bin/gnome-terminal")
+    import subprocess
+    monkeypatch.setattr(winmod, "ensure_writable", lambda run=None: subprocess.CompletedProcess([], 0, "", ""))
+    rec = Recorder()
+    monkeypatch.setattr(winterm.shutil, "which", rec.which)
+    assert winterm.open_terminal(run=rec.run, popen=rec.popen) == 0
+    assert rec.popened                                      # reached the terminal, not refused on "unreadable"
 
 
 def test_a_refused_mount_is_reported_and_no_terminal_opens(monkeypatch):
