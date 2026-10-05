@@ -150,7 +150,8 @@ def align_down(value: int, unit: int) -> int:
 
 def _lsblk(path: Optional[str] = None) -> list[dict]:
     argv = ["lsblk", "-J", "-b", "-o",
-            "NAME,PATH,SIZE,TYPE,RM,MODEL,TRAN,FSTYPE,LABEL,MOUNTPOINTS,LOG-SEC"]
+            "NAME,PATH,SIZE,TYPE,RM,MODEL,TRAN,FSTYPE,LABEL,MOUNTPOINTS,LOG-SEC,PTTYPE,PARTTYPE,PARTUUID,"
+            "PARTLABEL,PARTN"]
     if path:
         argv.append(path)
     return json.loads(run(argv).stdout)["blockdevices"]
@@ -173,8 +174,46 @@ def _probe_fstype(path: str) -> str:
     return proc.stdout.strip() if proc.returncode == 0 else ""
 
 
+def _lsblk_fallback_partitions(node: dict, sector: int) -> list[Partition]:
+    """Partitions read from lsblk's own udev-sourced columns alone - used only when sfdisk could not be read at
+    all (see read_disk). lsblk reads udev/sysfs, not the raw device, so this needs no elevated privilege
+    (confirmed live: a user outside the ``disk`` group gets "Permission denied" opening the raw device node, which
+    a plain ``sfdisk``/``blkid`` probe needs). No ``start`` offset is available this way - nothing unprivileged
+    needs it, and guessing at a sector/byte conversion without sfdisk to confirm it against would risk silently
+    wrong math on a 4Kn drive, worse than just not having it."""
+    found = []
+    for child in _flatten(node):
+        if child is node or not child.get("parttype"):
+            continue
+        number = child.get("partn")
+        if number is None:
+            match = re.search(r"(\d+)$", child["path"])
+            number = int(match.group(1)) if match else 0
+        found.append(Partition(
+            number=int(number),
+            path=child["path"],
+            start=0,
+            size=int(child["size"]),
+            type_guid=child["parttype"].lower(),
+            uuid=(child.get("partuuid") or "").lower(),
+            name=child.get("partlabel") or "",
+            fstype=child.get("fstype") or _probe_fstype(child["path"]),
+            label=child.get("label") or "",
+            mountpoints=_mountpoints(child),
+        ))
+    return found
+
+
 def read_disk(path: str) -> Disk:
-    """Describe one whole disk, including its GPT partitions."""
+    """Describe one whole disk, including its GPT partitions.
+
+    Reads the partition table via ``sfdisk -J``, same as always - every *existing* caller already runs privileged
+    (the partitioner, the installer, Remove LintabOS), and this is the synchronous, authoritative source (reads
+    the on-disk table directly, not a cache that can lag behind a table just written, which matters right after
+    the installer's own sfdisk calls). Only when sfdisk cannot be read at all - confirmed live: a user outside the
+    ``disk`` group gets "Permission denied" opening the raw device, exactly LinWinMod's deliberately-unprivileged
+    scan - this falls back to lsblk's own udev-sourced columns (PARTTYPE/PARTUUID/PARTLABEL), which need no
+    elevated privilege. That fallback can't provide ``start``, which is fine: nothing unprivileged needs it."""
     node = _lsblk(path)[0]
     sector = int(node.get("log-sec") or 512)
     disk = Disk(
@@ -190,7 +229,10 @@ def read_disk(path: str) -> Disk:
 
     dump = run(["sfdisk", "-J", path], check=False)
     if dump.returncode != 0 or not dump.stdout.strip():
-        return disk  # blank disk, no partition table yet
+        disk.label = node.get("pttype") or ""
+        if disk.label == "gpt":
+            disk.partitions = _lsblk_fallback_partitions(node, sector)
+        return disk
 
     table = json.loads(dump.stdout)["partitiontable"]
     disk.label = table.get("label", "")

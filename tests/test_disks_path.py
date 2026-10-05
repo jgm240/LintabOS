@@ -94,6 +94,30 @@ def test_mount_point_of_finds_an_existing_mount(tmp_path):
     assert disks.mount_point_of("/dev/nowhere", str(proc_mounts)) is None
 
 
+def test_lsblk_fallback_partitions_reads_type_uuid_name_fstype_label_without_start(monkeypatch):
+    """Matches real output captured live from a Duet 3 running unprivileged: sfdisk can't open the raw device
+    ("Permission denied" outside the `disk` group), but lsblk's own udev-sourced columns still have everything
+    except a start offset, which nothing unprivileged needs anyway."""
+    node = {
+        "name": "nvme0n1", "path": "/dev/nvme0n1", "size": 256060514304, "pttype": "gpt",
+        "children": [
+            {"name": "nvme0n1p3", "path": "/dev/nvme0n1p3", "size": 198389530624, "fstype": "ntfs",
+             "label": "Windows-SSD", "mountpoints": [],
+             "parttype": "ebd0a0a2-b9e5-4433-87c0-68b6b72699c7",
+             "partuuid": "b3216a56-55b7-4918-9bde-b845cf3aaf37", "partlabel": "Basic data partition", "partn": 3},
+            {"name": "nvme0n1p2", "path": "/dev/nvme0n1p2", "size": 16777216, "fstype": None, "label": None,
+             "mountpoints": [], "parttype": None, "partuuid": None, "partlabel": None, "partn": None},
+        ],
+    }
+    found = disks._lsblk_fallback_partitions(node, sector=512)
+    assert len(found) == 1                                  # the MSR (no parttype) is correctly skipped
+    part = found[0]
+    assert part.path == "/dev/nvme0n1p3" and part.number == 3 and part.start == 0
+    assert part.type_guid == "ebd0a0a2-b9e5-4433-87c0-68b6b72699c7"
+    assert part.uuid == "b3216a56-55b7-4918-9bde-b845cf3aaf37"
+    assert part.fstype == "ntfs" and part.label == "Windows-SSD" and part.is_ms_data
+
+
 def test_esp_has_windows_reuses_an_already_mounted_esp_instead_of_remounting(monkeypatch, tmp_path):
     already_mounted = tmp_path / "boot-efi"
     (already_mounted / "EFI" / "Microsoft" / "Boot").mkdir(parents=True)

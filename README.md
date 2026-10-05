@@ -273,6 +273,15 @@ read from upstream sources and other people's probes, so treat them as expected-
   choice; reaching it directly needs editing Windows' Boot Configuration Data, a binary registry hive — see
   **"Windows Boot Configuration (Experimental)" (0.3.11)** below for the one place LintabOS now does exactly that,
   and the safety net around it.
+- **LinWinMod: the NTFS picker was invisible, not just missing an entry (0.3.15)**: `disks.read_disk()` has always
+  read the partition table via `sfdisk -J`, which needs raw device access (`root:disk`, mode `660`) that
+  LinWinMod's deliberately-unprivileged scan was never granted - so it silently got zero partitions back, every
+  time, on any real installed tablet, not just for the WinRE case 0.3.14 fixed. Now falls back to `lsblk`'s own
+  udev-sourced columns (genuinely unprivileged, confirmed live) when `sfdisk` can't open the device at all; the
+  `sfdisk` path every *privileged* caller (partitioner, installer, Remove LintabOS) already uses is unchanged.
+  Deliberately not fixed by adding the user to the `disk` group - that grants raw read+write to the whole disk
+  indefinitely, which would let any process bypass LinWinMod's own SAM/SECURITY read refusal by reading those
+  bytes directly off the device.
 - **LinWinMod NTFS picker: the Windows Recovery partition was invisible to it (0.3.14)**: found live on a real
   Duet 3 - `WINRE_DRV` is genuinely NTFS-formatted but carries the Windows Recovery Environment GPT type, not
   Microsoft basic data, so `list_microsoft_data_partitions()` (the manual "pick any NTFS partition" picker) never
